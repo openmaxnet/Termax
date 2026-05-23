@@ -1,0 +1,203 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════
+   Tailwind v4 主题映射
+   将 shadcn/ui 标准变量名映射为 Tailwind 工具类
+   使 bg-popover、text-muted-foreground 等类名生效
+   ═══════════════════════════════════════════ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+/* ═══════════════════════════════════════════
+   Design Token System
+   所有颜色 token 由主题系统在运行时设置（见 src/themes/）
+   此处仅定义 shadcn/ui 映射和固定值 token
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* ── shadcn/ui 映射变量（引用 --tx-* token，值由主题系统在运行时设置） ── */
+  --background: var(--tx-bg-base);
+  --foreground: var(--tx-text-primary);
+  --card: var(--tx-bg-surface);
+  --card-foreground: var(--tx-text-primary);
+  --popover: var(--tx-bg-elevated);
+  --popover-foreground: var(--tx-text-primary);
+  --primary: var(--tx-accent-default);
+  --primary-foreground: var(--tx-text-inverse);
+  --secondary: var(--tx-bg-surface);
+  --secondary-foreground: var(--tx-text-primary);
+  --muted: var(--tx-bg-hover);
+  --muted-foreground: var(--tx-text-secondary);
+  --accent: var(--tx-accent-muted);
+  --accent-foreground: var(--tx-text-primary);
+  --destructive: var(--tx-red);
+  --destructive-foreground: var(--tx-text-inverse);
+  --border: var(--tx-border-light);
+  --input: var(--tx-border-default);
+  --ring: var(--tx-border-focus);
+  --radius: var(--tx-radius-md);
+
+  /* ── 固定值 token（不属于颜色主题，不随主题切换） ── */
+  --tx-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --tx-font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+  --tx-font-size-xs: 11px;
+  --tx-font-size-sm: 12px;
+  --tx-font-size-base: 13px;
+  --tx-font-size-lg: 14px;
+
+  /* ── Spacing ── */
+  --tx-space-1: 4px;
+  --tx-space-2: 8px;
+  --tx-space-3: 12px;
+  --tx-space-4: 16px;
+
+  /* ── Radii ── */
+  --tx-radius-sm: 4px;
+  --tx-radius-md: 6px;
+  --tx-radius-lg: 8px;
+}
+
+/* ── Global resets ── */
+/* 放在 @layer base 中确保 Tailwind utilities（@layer utilities）能正常覆盖 */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+body {
+  font-family: var(--tx-font-sans);
+  font-size: var(--tx-font-size-base);
+  background: var(--tx-bg-base);
+  color: var(--tx-text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--tx-border-light);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--tx-border-default);
+}
+
+/* ── Focus ring ── */
+/* 放在 @layer base 中确保 Tailwind 的 focus-visible:outline-none / ring-0 能正常覆盖 */
+@layer base {
+  input:focus-visible,
+  select:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--tx-border-focus);
+    outline-offset: -1px;
+  }
+}
+
+/* ── Title bar drag region ── */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] select,
+[data-tauri-drag-region] [data-no-drag] {
+  -webkit-app-region: no-drag;
+}
+
+/* ── Hide native password reveal (we have our own) ── */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-reveal-button,
+input[type="password"]::-webkit-password-toggle-button {
+  display: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none;
+}
+
+/* ── Hide number input stepper ── */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ── Hide scrollbar but keep scrollable ── */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Select dropdown dark mode ── */
+select option {
+  background: var(--tx-bg-elevated);
+  color: var(--tx-text-primary);
+}
+
+/* ── Dialog animations ── */
+@keyframes tx-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tx-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes tx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

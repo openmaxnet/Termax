@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>termax</title>
+    <script>
+      // 在浏览器首次绘制前同步主题和背景色，防止闪白（flash of light theme）
+      (function() {
+        try {
+          var isDark = false,
+              theme = null;
+          var raw = localStorage.getItem('termax-settings');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            theme = parsed && parsed.state && parsed.state.appTheme;
+          }
+          if (theme === 'dark') {
+            isDark = true;
+          } else if (theme === 'system' || !theme) {
+            isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          }
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            // 浅色主题时立即覆盖背景，防止 Tauri WebView 初始深色闪一下
+            document.documentElement.style.backgroundColor = '#ffffff';
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <style>
+      /* CSS 文件加载前的保护：直接锁定背景色避免任何白色帧 */
+      html { background-color: #121314; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

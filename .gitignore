@@ -1,0 +1,49 @@
+# ── Dependencies ──
+node_modules/
+
+# ── Build output ──
+dist/
+dist-ssr/
+src-tauri/target/
+src-tauri/gen/
+
+# ── Rust (keep Cargo.lock — it's an app) ──
+*.rs.bk
+*.pdb
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── IDE ──
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Logs ──
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ── Misc ──
+*.local
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ── Tauri installer temp files ──
+src-tauri/installer/header.bmp
+src-tauri/installer/sidebar.bmp

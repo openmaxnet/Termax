@@ -1,0 +1,36 @@
+.xterm {
+  padding: 6px 6px 0;
+  height: 100%;
+}
+
+.xterm-viewport {
+  background-color: transparent !important;
+}
+
+.xterm-scrollbar {
+  width: 4px !important;
+}
+
+.xterm-slider {
+  width: 4px !important;
+  border-radius: 2px;
+}
+
+/* auto: 默认透明，class 触发显示 */
+[data-scrollbar="auto"] .xterm-slider {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+[data-scrollbar="auto"] .xterm-slider--scrolling {
+  opacity: 1;
+}
+
+/* visible: 始终可见 */
+[data-scrollbar="visible"] .xterm-slider {
+  opacity: 1;
+}
+
+/* hidden: 隐藏滚动条 */
+[data-scrollbar="hidden"] .xterm-scrollbar {
+  display: none;
+}

@@ -1,0 +1,3 @@
+allowBuilds:
+  msw: true
+storeDir: D:\.pnpm-store\v11
