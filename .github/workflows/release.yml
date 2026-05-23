@@ -3,37 +3,38 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   release:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ''
-          - platform: ubuntu-22.04
-            args: '-- bundles deb appimage'
-          - platform: macos-latest
-            args: '--bundles dmg app'
-
-    runs-on: ${{ matrix.platform }}
-
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 11
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -53,7 +54,13 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Termax ${{ github.ref_name }}'
-          releaseBody: 'See the assets below for the download.'
+          releaseBody: |
+            ## Termax ${{ github.ref_name }}
+
+            下载 `Termax_*.exe` 安装包，双击运行即可安装。无需管理员权限，支持自定义安装目录。
+
+            ---
+            🤖 Automated build by GitHub Actions
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: '--bundles nsis'
