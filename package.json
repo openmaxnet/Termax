@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tauri": "cargo tauri",
+    "tauri": "tauri",
     "build:portable": "cargo tauri build --no-bundle && node scripts/portable.mjs",
     "build:nsis": "cargo tauri build --bundles nsis",
     "build:msi": "cargo tauri build --bundles msi",

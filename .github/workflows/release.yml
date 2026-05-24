@@ -58,9 +58,6 @@ jobs:
             ## Termax ${{ github.ref_name }}
 
             下载 `Termax_*.exe` 安装包，双击运行即可安装。无需管理员权限，支持自定义安装目录。
-
-            ---
-            🤖 Automated build by GitHub Actions
           releaseDraft: false
           prerelease: false
           args: '--bundles nsis'
