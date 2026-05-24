@@ -43,7 +43,3 @@ pnpm-debug.log*
 *.ntvs*
 *.njsproj
 *.sln
-
-# ── Tauri installer temp files ──
-src-tauri/installer/header.bmp
-src-tauri/installer/sidebar.bmp
