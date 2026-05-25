@@ -47,6 +47,25 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate changelog
+        shell: bash
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude="${{ github.ref_name }}" 2>/dev/null || echo "")
+          {
+            if [ -n "$PREV_TAG" ]; then
+              echo "## 更新日志 ($PREV_TAG → ${{ github.ref_name }})"
+              echo ""
+              git log --oneline --no-decorate "${PREV_TAG}..HEAD" | sed 's/^/- /'
+            else
+              echo "## 首次发布"
+              echo ""
+              git log --oneline --no-decorate | sed 's/^/- /'
+            fi
+          } > changelog.md
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          cat changelog.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -58,6 +77,8 @@ jobs:
             ## Termax ${{ github.ref_name }}
 
             下载 `Termax_*.exe` 安装包，双击运行即可安装。无需管理员权限，支持自定义安装目录。
+
+            ${{ env.CHANGELOG }}
           releaseDraft: false
           prerelease: false
           args: '--bundles nsis'

@@ -14,14 +14,16 @@
 .xterm-slider {
   width: 4px !important;
   border-radius: 2px;
+  background: var(--tx-border-light);
 }
 
-/* auto: 默认透明，class 触发显示 */
+/* auto: 默认半透明，hover/滚动时完全显示 */
 [data-scrollbar="auto"] .xterm-slider {
-  opacity: 0;
+  opacity: 0.3;
   transition: opacity 0.25s;
 }
-[data-scrollbar="auto"] .xterm-slider--scrolling {
+[data-scrollbar="auto"] .xterm-slider--scrolling,
+[data-scrollbar="auto"] .xterm-slider:hover {
   opacity: 1;
 }
 

@@ -3,6 +3,7 @@ import { Terminal as XtermTerminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { open } from '@tauri-apps/plugin-shell';
 import { ipc, events } from '@/lib/ipc';
 import { getMessage } from '@/i18n';
 import { useTerminalStore } from '@/stores/terminalStore';
@@ -31,6 +32,7 @@ export interface UseTerminalConnectionParams {
     fontFamily: string;
     scrollbackLines: number;
     enableWebLinks: boolean;
+    webLinksModifier: 'none' | 'ctrl';
   };
   colors: Record<string, string>;
 }
@@ -50,7 +52,7 @@ export function useTerminalConnection(params: UseTerminalConnectionParams) {
   useEffect(() => {
     if (!containerRef.current || termRef.current) return;
 
-    const { cursorBlink, cursorStyle, fontSize, fontFamily, scrollbackLines, enableWebLinks } = terminalSettings;
+    const { cursorBlink, cursorStyle, fontSize, fontFamily, scrollbackLines, enableWebLinks, webLinksModifier } = terminalSettings;
 
     const term = new XtermTerminal({
       cursorBlink, cursorStyle, fontSize, fontFamily, scrollback: scrollbackLines,
@@ -76,8 +78,46 @@ export function useTerminalConnection(params: UseTerminalConnectionParams) {
     term.loadAddon(fitAddon);
     term.loadAddon(searchAddon);
 
-    const webLinksAddon = enableWebLinks ? new WebLinksAddon() : null;
-    if (webLinksAddon) term.loadAddon(webLinksAddon);
+    // 超链接解析：注册 WebLinksAddon + hover tooltip
+    let linkTooltip: HTMLDivElement | null = null;
+    if (enableWebLinks) {
+      const modifierKey = webLinksModifier === 'ctrl' ? 'Ctrl' : null;
+      const tipText = modifierKey
+        ? getMessage('settings.webLinksClickHint', { modifier: modifierKey })
+        : getMessage('settings.webLinksClick');
+
+      linkTooltip = document.createElement('div');
+      linkTooltip.style.cssText =
+        'position:fixed;z-index:100;padding:3px 8px;font-size:11px;font-family:var(--tx-font-sans);' +
+        'color:var(--tx-text-primary);background:var(--tx-bg-elevated);' +
+        'border-radius:var(--tx-radius-sm);box-shadow:var(--tx-shadow-md);' +
+        'border:1px solid var(--tx-border-light);' +
+        'pointer-events:none;opacity:0;transition:opacity 0.15s;white-space:nowrap;';
+      document.body.appendChild(linkTooltip);
+
+      const webLinksAddon = new WebLinksAddon(
+        (event, uri) => {
+          if (!modifierKey || event.ctrlKey) {
+            open(uri);
+          }
+        },
+        {
+          hover(event, _text, _location) {
+            if (linkTooltip) {
+              linkTooltip.textContent = tipText;
+              linkTooltip.style.left = event.clientX + 'px';
+              linkTooltip.style.top = (event.clientY - 32) + 'px';
+              linkTooltip.style.transform = 'translateX(-50%)';
+              linkTooltip.style.opacity = '1';
+            }
+          },
+          leave() {
+            if (linkTooltip) linkTooltip.style.opacity = '0';
+          },
+        },
+      );
+      term.loadAddon(webLinksAddon);
+    }
     term.open(containerRef.current);
     fitAddon.fit();
     term.focus();
@@ -116,6 +156,7 @@ export function useTerminalConnection(params: UseTerminalConnectionParams) {
     // 发起连接：显示"正在连接..."提示，连接成功后监听输出事件
     const startConnecting = (isReconnect?: boolean) => {
       sessionDisposed = false;
+      connectedShown = false;
       if (isReconnect) term.reset();
 
       term.write(`\r\x1b[K\x1b[0m${getMessage('terminal.connecting', {
@@ -240,6 +281,7 @@ export function useTerminalConnection(params: UseTerminalConnectionParams) {
       if (currentSessionId) {
         (isLocal ? ipc.local.disconnect(currentSessionId) : ipc.ssh.disconnect(currentSessionId)).catch(() => {});
       }
+      if (linkTooltip) { linkTooltip.remove(); linkTooltip = null; }
       term.dispose();
       termRef.current = null;
       fitRef.current = null;

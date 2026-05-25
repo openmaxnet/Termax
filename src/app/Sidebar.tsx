@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import { Server } from 'lucide-react';
 import type { ConnectionConfig } from '@/lib/ipc';
+import { copyToClipboard } from '@/lib/clipboard';
 import { ipc } from '@/lib/ipc';
 import { useI18n } from '@/i18n';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -150,7 +151,7 @@ const ConnectionTree: React.FC<TreeProps> = ({ configs, onConnect, onDelete, onE
                   <Icon icon="solar:folder-linear" width={14} height={14} />Collapse All
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => navigator.clipboard.writeText(groupName)}>
+                <ContextMenuItem onClick={() => copyToClipboard(groupName)}>
                   <Icon icon="solar:copy-linear" width={14} height={14} />Copy "{groupName}"
                 </ContextMenuItem>
               </ContextMenuContent>

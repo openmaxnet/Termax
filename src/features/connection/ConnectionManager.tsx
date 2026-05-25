@@ -11,6 +11,10 @@ import { ForwardConfig } from '@/features/forward/ForwardConfig';
 import { ProxyConfig } from './ProxyConfig';
 import { BastionConfig } from './BastionConfig';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ipc } from '@/lib/ipc';
 import { useI18n } from '@/i18n';
 import type { BastionConfig as BastionConfigType, ConnectionConfig, PortForwardRule, SshProxyConfig } from '@/lib/ipc';
@@ -52,6 +56,7 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
     () => editConfig?.proxy ?? null,
   );
   const formRef = useRef<ConnectionFormHandle>(null);
+  const [overwriteTarget, setOverwriteTarget] = useState<{ data: ConnectionConfig; existing: ConnectionConfig } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -74,20 +79,31 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
     } catch {}
   };
 
-  // 保存配置并建立连接（检测重名时提示覆盖）
+  // 保存配置并建立连接（检测重名时弹出 AlertDialog 确认覆盖）
   const handleSaveAndConnect = useCallback(async (data: ConnectionConfig) => {
     const existing = allConfigs.find((c) => c.name === data.name && c.id !== data.id);
     if (existing) {
-      if (!window.confirm(`"${data.name}" already exists. Overwrite?`)) return;
-      await ipc.config.update(existing.id, { ...data, id: existing.id }).catch(() => {});
-    } else {
-      await ipc.config.save(data).catch(() => {});
+      setOverwriteTarget({ data, existing });
+      return;
     }
+    await ipc.config.save(data).catch(() => {});
     await loadConfigs();
     saveRecent(data);
     onConnect(data);
     onClose();
   }, [allConfigs, loadConfigs, onConnect, onClose]);
+
+  // 确认覆盖重名配置
+  const handleOverwriteConfirm = useCallback(async () => {
+    if (!overwriteTarget) return;
+    const { data, existing } = overwriteTarget;
+    setOverwriteTarget(null);
+    await ipc.config.update(existing.id, { ...data, id: existing.id }).catch(() => {});
+    await loadConfigs();
+    saveRecent(data);
+    onConnect(data);
+    onClose();
+  }, [overwriteTarget, loadConfigs, onConnect, onClose]);
 
   // 更新已保存的配置并连接
   const handleSavedUpdate = useCallback(async (data: ConnectionConfig) => {
@@ -256,6 +272,22 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
           />
         ))}
       </div>
+
+      {/* 重名覆盖确认弹窗 */}
+      <AlertDialog open={overwriteTarget !== null} onOpenChange={(open) => { if (!open) setOverwriteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('manager.overwriteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{overwriteTarget?.data.name}" {t('manager.overwriteMessage')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('manager.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleOverwriteConfirm}>{t('manager.overwrite')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

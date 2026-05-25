@@ -10,6 +10,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Icon } from '@iconify/react';
 
 import type { ConnectionConfig } from '@/lib/ipc';
+import { copyToClipboard, pasteFromClipboard } from '@/lib/clipboard';
 import { useTerminalStore, type TabType, type TerminalStore } from '@/stores/terminalStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useI18n, getMessage } from '@/i18n';
@@ -67,6 +68,7 @@ export const TerminalTab = React.memo(function TerminalTab({ tabId, tabType, con
   const rightClickAction = useSettingsStore((s) => s.rightClickAction);
   const scrollbarStyle = useSettingsStore((s) => s.scrollbarStyle);
   const enableWebLinks = useSettingsStore((s) => s.enableWebLinks);
+  const webLinksModifier = useSettingsStore((s) => s.webLinksModifier);
   const fontFamily = `'${terminalFont}', '${terminalFontFallback}', monospace`;
   const terminalThemeDark = useSettingsStore((s) => s.terminalThemeDark);
   const terminalThemeLight = useSettingsStore((s) => s.terminalThemeLight);
@@ -101,7 +103,7 @@ export const TerminalTab = React.memo(function TerminalTab({ tabId, tabType, con
     containerRef, termRef, fitRef, searchRef, reconnectRef,
     tabId, tabType, config, shellPath,
     setConnected, setSessionId, removeTab, setShowSearch,
-    terminalSettings: { cursorBlink, cursorStyle, fontSize, fontFamily, scrollbackLines, enableWebLinks },
+    terminalSettings: { cursorBlink, cursorStyle, fontSize, fontFamily, scrollbackLines, enableWebLinks, webLinksModifier },
     colors,
   });
 
@@ -198,7 +200,7 @@ export const TerminalTab = React.memo(function TerminalTab({ tabId, tabType, con
     if (!copyOnSelect) return;
     const handler = () => {
       const sel = term.getSelection();
-      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+      if (sel) copyToClipboard(sel).catch(() => {});
     };
     term.onSelectionChange(handler);
     return () => { /* cleanup handled by term disposal */ };
@@ -241,13 +243,13 @@ export const TerminalTab = React.memo(function TerminalTab({ tabId, tabType, con
           e.preventDefault();
           if (rightClickAction === 'none') return;
           if (rightClickAction === 'paste') {
-            navigator.clipboard.readText().then(t => termRef.current?.paste(t)).catch(() => {});
+            pasteFromClipboard().then(t => termRef.current?.paste(t)).catch(() => {});
           } else if (rightClickAction === 'copyPaste') {
             const sel = termRef.current?.getSelection();
             if (sel) {
-              navigator.clipboard.writeText(sel).catch(() => {});
+              copyToClipboard(sel).catch(() => {});
             } else {
-              navigator.clipboard.readText().then(t => termRef.current?.paste(t)).catch(() => {});
+              pasteFromClipboard().then(t => termRef.current?.paste(t)).catch(() => {});
             }
           }
         }}
@@ -267,11 +269,11 @@ export const TerminalTab = React.memo(function TerminalTab({ tabId, tabType, con
           boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
         }}>
           <Tooltip>
-            <TooltipTrigger render={<Button variant="ghost" size="icon" onClick={() => { const s = termRef.current?.getSelection(); if (s) navigator.clipboard.writeText(s); }}><Icon icon="solar:copy-linear" width={16} height={16} /></Button>} />
+            <TooltipTrigger render={<Button variant="ghost" size="icon" onClick={() => { const s = termRef.current?.getSelection(); if (s) copyToClipboard(s); }}><Icon icon="solar:copy-linear" width={16} height={16} /></Button>} />
             <TooltipContent>{getMessage('terminal.copy')}</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger render={<Button variant="ghost" size="icon" onClick={() => navigator.clipboard.readText().then(t => termRef.current?.paste(t)).catch(() => {})}><Icon icon="solar:clipboard-linear" width={16} height={16} /></Button>} />
+            <TooltipTrigger render={<Button variant="ghost" size="icon" onClick={() => pasteFromClipboard().then(t => termRef.current?.paste(t)).catch(() => {})}><Icon icon="solar:clipboard-linear" width={16} height={16} /></Button>} />
             <TooltipContent>{getMessage('terminal.paste')}</TooltipContent>
           </Tooltip>
           <Tooltip>

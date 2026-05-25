@@ -234,6 +234,8 @@ async fn run_session(
     );
 
     // ── I/O 循环：同时监听前端命令通道和 SSH 数据通道 ──
+    let mut remote_closed = false;
+
     loop {
         tokio::select! {
             Some(cmd) = cmd_rx.recv() => {
@@ -264,11 +266,21 @@ async fn run_session(
                             "data": bytes,
                         }));
                     }
-                    Some(ChannelMsg::Close) | None => break,
+                    Some(ChannelMsg::Close) | None => {
+                        remote_closed = true;
+                        break;
+                    }
                     _ => {}
                 }
             }
         }
+    }
+
+    if remote_closed {
+        let _ = app_handle.emit("session-error", serde_json::json!({
+            "sessionId": &sid,
+            "error": "连接已断开（远程主机关闭了连接）",
+        }));
     }
 
     Ok(())

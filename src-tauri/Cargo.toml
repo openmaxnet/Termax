@@ -58,3 +58,4 @@ keyring = "3.6"
 
 # System font enumeration
 font-kit = "0.14"
+tauri-plugin-clipboard-manager = "2.3.2"

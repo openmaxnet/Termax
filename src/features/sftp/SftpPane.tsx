@@ -182,7 +182,7 @@ export const SftpPane: React.FC<SftpPaneProps> = ({
       }
       await loadDir(cwd);
       setEditing(null); setEditValue('');
-    } catch (err) { alert(fmtErr(err)); setEditing(null); setEditValue(''); }
+    } catch (err) { console.error(fmtErr(err)); setEditing(null); setEditValue(''); }
     confirmingRef.current = false;
   };
 

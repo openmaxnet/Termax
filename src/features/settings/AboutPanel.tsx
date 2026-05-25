@@ -3,6 +3,7 @@
  * 显示应用信息、技术栈版本、更新检查与下载
  */
 import React, { useState, useEffect } from 'react';
+import { open } from '@tauri-apps/plugin-shell';
 import { useI18n } from '@/i18n';
 import appLogo from '@/assets/app-ico.png';
 import { Section, InfoRow } from './helpers';
@@ -117,7 +118,7 @@ export const AboutPanel: React.FC = () => {
         <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--tx-text-tertiary)', marginTop: 2 }}>
           <span>Termax Team</span>
           <span style={{ cursor: 'pointer', color: 'var(--tx-text-link)' }}
-            onClick={() => { window.open('https://github.com/termax/termax', '_blank'); }}
+            onClick={() => { open('https://github.com/termax/termax'); }}
             onMouseEnter={(e) => { e.currentTarget.style.textDecoration = 'underline'; }}
             onMouseLeave={(e) => { e.currentTarget.style.textDecoration = 'none'; }}
           >GitHub</span>

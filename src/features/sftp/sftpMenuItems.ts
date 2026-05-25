@@ -4,6 +4,7 @@
  * 包括上传/下载/编辑/重命名/删除/复制路径/复制名称等操作
  */
 import { ipc } from '@/lib/ipc';
+import { copyToClipboard } from '@/lib/clipboard';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { ConnectionConfig } from '@/lib/ipc';
 import { fmtSftpError, isBinaryExt } from './utils';
@@ -52,7 +53,7 @@ export function buildMenuItems(
           const editorCommand = useSettingsStore.getState().editorCommand || undefined;
           const sessionId = await ipc.edit.start(config, e.path, editorCommand);
           callbacks.setActiveEdits((prev) => [...prev, { id: sessionId, path: e.path }]);
-        } catch (err) { alert(fmtSftpError(err)); }
+        } catch (err) { console.error(fmtSftpError(err)); }
       }},
     ] : []),
     ...(isEditing ? [
@@ -74,8 +75,8 @@ export function buildMenuItems(
       { label: t('sftpPane.copyToOther'), icon: 'solar:copy-linear', onClick: callbacks.onCopyToOtherPane },
     ] : []),
     { label: '', divider: true, onClick: () => {} },
-    { label: t('fileBrowser.copyPath'), icon: 'solar:clipboard-linear', onClick: () => navigator.clipboard.writeText(e.path) },
-    { label: t('fileBrowser.copyName'), icon: 'solar:clipboard-text-linear', onClick: () => navigator.clipboard.writeText(e.name) },
+    { label: t('fileBrowser.copyPath'), icon: 'solar:clipboard-linear', onClick: () => copyToClipboard(e.path) },
+    { label: t('fileBrowser.copyName'), icon: 'solar:clipboard-text-linear', onClick: () => copyToClipboard(e.name) },
     { label: '', divider: true, onClick: () => {} },
     { label: t('fileBrowser.delete'), icon: 'solar:trash-bin-trash-linear', color: 'var(--tx-red)', onClick: () => callbacks.setDeleteTarget(e) },
   ];
