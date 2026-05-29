@@ -40,7 +40,7 @@ pub fn migrate_credentials() {
     for (path, passphrase) in &unique_keys {
         // 检查该路径是否已有对应凭证
         let existing = credentials.iter().find(|c| {
-            if let CredentialKind::Key { path: p, .. } = &c.kind {
+            if let CredentialKind::Key { name: p, .. } = &c.kind {
                 p == path
             } else {
                 false
@@ -80,10 +80,14 @@ pub fn migrate_credentials() {
             id: cred_id.clone(),
             name: file_name,
             kind: CredentialKind::Key {
-                path: path.clone(),
+                name: path.clone(),
                 passphrase_stored: has_passphrase,
             },
             encrypted_secret: encrypted,
+            // 迁移时读取私钥文件内容并加密存储
+            encrypted_key_content: std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|content| crypto::encrypt(&content).ok()),
             has_secret: has_passphrase,
             created_at: now,
             updated_at: now,

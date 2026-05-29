@@ -141,7 +141,8 @@ pub fn find_by_id(id: &str) -> Option<SshCredential> {
 pub enum ResolvedAuth {
     Password(String),
     Key {
-        path: String,
+        /// 私钥内容（PEM 格式明文），从 encrypted_key_content 解密得到
+        key_content: String,
         passphrase: Option<String>,
     },
 }
@@ -151,10 +152,15 @@ pub enum ResolvedAuth {
 pub fn resolve_auth(auth: &AuthMethod) -> Result<ResolvedAuth, AppError> {
     match auth {
         AuthMethod::Password(pw) => Ok(ResolvedAuth::Password(pw.clone())),
-        AuthMethod::Key { path, passphrase } => Ok(ResolvedAuth::Key {
-            path: path.clone(),
-            passphrase: passphrase.clone(),
-        }),
+        // 直接 Key 认证（连接配置中内嵌的路径），仍从文件读取
+        AuthMethod::Key { path, passphrase } => {
+            let key_content = std::fs::read_to_string(path)
+                .map_err(|e| AppError::Io(format!("读取密钥文件失败: {}", e)))?;
+            Ok(ResolvedAuth::Key {
+                key_content,
+                passphrase: passphrase.clone(),
+            })
+        }
         AuthMethod::Credential(id) => {
             log::info!("[credential_store] 解析凭证引用 id={}", id);
             let cred = find_by_id(id).ok_or_else(|| {
@@ -176,9 +182,17 @@ pub fn resolve_auth(auth: &AuthMethod) -> Result<ResolvedAuth, AppError> {
 pub fn resolve_credential(cred: &SshCredential) -> Result<ResolvedAuth, AppError> {
     match &cred.kind {
         CredentialKind::Key {
-            path,
+            name: _,
             passphrase_stored: _,
         } => {
+            // 解密私钥内容
+            let key_content = match &cred.encrypted_key_content {
+                Some(enc) => crypto::decrypt(enc)?,
+                None => {
+                    return Err(AppError::CryptoError("凭证未保存私钥内容".into()));
+                }
+            };
+            // 解密密码短语（可选）
             let passphrase = match &cred.encrypted_secret {
                 Some(enc) => {
                     let pw = crypto::decrypt(enc)?;
@@ -191,7 +205,7 @@ pub fn resolve_credential(cred: &SshCredential) -> Result<ResolvedAuth, AppError
                 None => None,
             };
             Ok(ResolvedAuth::Key {
-                path: path.clone(),
+                key_content,
                 passphrase,
             })
         }

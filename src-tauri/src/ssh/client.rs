@@ -98,15 +98,15 @@ async fn connect_and_auth(
                 return Err(AppError::AuthFailed);
             }
         }
-        credential_store::ResolvedAuth::Key { path, passphrase } => {
+        credential_store::ResolvedAuth::Key { key_content, passphrase } => {
             log::info!(
-                "[connect_and_auth] 使用密钥认证 path={} passphrase={}",
-                path,
+                "[connect_and_auth] 使用密钥认证 (内容长度={}) passphrase={}",
+                key_content.len(),
                 if passphrase.is_some() { "已提供" } else { "无" }
             );
-            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
+            let key = russh::keys::decode_secret_key(&key_content, passphrase.as_deref())
                 .map_err(|e| {
-                    log::error!("[connect_and_auth] 密钥加载失败 path={}: {}", path, e);
+                    log::error!("[connect_and_auth] 密钥解析失败: {}", e);
                     AppError::SshError(format!("密钥错误: {}", e))
                 })?;
             log::info!("[connect_and_auth] 密钥加载成功，开始公钥认证");
@@ -361,15 +361,15 @@ pub async fn test_connection(config: &ConnectionConfig) -> CmdResult<String> {
                         return Err(AppError::AuthFailed);
                     }
                 }
-                credential_store::ResolvedAuth::Key { path, passphrase } => {
+                credential_store::ResolvedAuth::Key { key_content, passphrase } => {
                     log::info!(
-                        "[test_connection] 使用密钥认证 path={} passphrase={}",
-                        path,
+                        "[test_connection] 使用密钥认证 (内容长度={}) passphrase={}",
+                        key_content.len(),
                         if passphrase.is_some() { "已提供" } else { "无" }
                     );
-                    let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
+                    let key = russh::keys::decode_secret_key(&key_content, passphrase.as_deref())
                         .map_err(|e| {
-                            log::error!("[test_connection] 密钥加载失败 path={}: {}", path, e);
+                            log::error!("[test_connection] 密钥解析失败: {}", e);
                             AppError::SshError(format!("密钥错误: {}", e))
                         })?;
                     log::info!("[test_connection] 密钥加载成功，开始公钥认证");

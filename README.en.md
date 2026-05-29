@@ -19,26 +19,31 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
 </p>
 
+<p align="center">
+  <img src=".github/asset/home.png" width="720" alt="Termax Screenshot">
+</p>
+
 ---
 
 ## Features
 
 - **SSH Connections** — Password / Key authentication
+- **SSH Credential Management** — AES-256-GCM encrypted storage, unified key & password management
+- **Bastion Host / Jump Host** — Proxy connections through jump servers
+- **Port Forwarding** — Local / Remote / Dynamic port forwarding
 - **Multi-Tab Terminal** — Drag-to-reorder, context menu, one-click reconnect
 - **SFTP File Browser** — Upload / Download / Chunked transfer with progress / Transfer history / Cancel
 - **Local Terminal** — Windows / macOS / Linux local Shell + WSL support
 - **Split Pane** — Horizontal / Vertical split, flexible switching
 - **Broadcast Input** — Select multiple terminals and sync keyboard input
 - **System Monitoring** — Real-time CPU / Memory / Disk metrics
+- **Debug Panel** — IPC call timing, FPS / Memory metrics, structured log export
 - **Theme System** — Termax Dark / Light, One Dark, Dracula, extensible
 - **Internationalization** — 中文 / English
 - **In-App Updates** — Version detection via GitHub Releases
 
 **Coming Soon:**
 
-- Port Forwarding (Local / Remote / Dynamic)
-- SSH Agent Forwarding
-- Bastion Host / Jump Host
 - Command Snippets
 - Android Mobile Support
 
@@ -64,31 +69,27 @@
 pnpm install
 ```
 
-### Development
+### Development & Build Commands
 
-```bash
-pnpm dev
-```
-
-### Build
-
-```bash
-# Build frontend + Tauri app
-pnpm build
-
-# Build frontend only
-pnpm preview
-```
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start dev mode (hot reload) |
+| `pnpm build` | Build frontend (type check + Vite bundle) |
+| `pnpm build:nsis` | Build Windows NSIS installer (`.exe`) |
+| `pnpm build:msi` | Build Windows MSI installer |
+| `pnpm build:portable` | Build Windows portable (no installer) |
+| `pnpm lint` | ESLint code check |
+| `pnpm gen:installer-assets` | Generate installer bitmap assets |
 
 ## Download
 
-Download the latest release from [GitHub Releases](https://github.com/termax/termax/releases):
+Download the latest release from [GitHub Releases](https://github.com/openmaxnet/Termax/releases):
 
-| Platform | Format |
-|----------|--------|
-| Windows | `.exe` installer |
-| macOS | `.dmg` |
-| Linux | `.deb` / `.AppImage` |
+| Platform | Format | Status |
+|----------|--------|--------|
+| Windows | `.exe` installer / Portable | ✅ Supported |
+| macOS | `.dmg` | 🚧 Coming soon |
+| Linux | `.deb` / `.AppImage` | 🚧 Coming soon |
 
 ## Project Structure
 
@@ -101,13 +102,14 @@ Termax/
 │   │   ├── sftp/             # SFTP file operations
 │   │   ├── local/            # Local terminal PTY
 │   │   ├── monitor/          # System monitoring
-│   │   └── storage/          # Persistent storage
+│   │   └── storage/          # Persistent storage (SQLite)
 │   └── Cargo.toml
 ├── src/                      # React frontend
 │   ├── app/                  # App shell (TitleBar / Sidebar / StatusBar)
 │   ├── features/             # Feature modules
 │   │   ├── terminal/         # Terminal
 │   │   ├── connection/       # Connection management
+│   │   ├── credential/       # SSH credential management
 │   │   ├── sftp/             # SFTP file browser
 │   │   ├── monitoring/       # System monitoring
 │   │   └── settings/         # Settings
@@ -122,19 +124,6 @@ Termax/
 ```
 
 ## Development Guide
-
-### Git Commit Convention
-
-```
-<type>(<scope>): <short description>
-
-Types: feat | fix | refactor | style | docs | test | chore
-Scopes: rust | ui | tauri | config
-
-Examples:
-  feat(rust): Add SSH key authentication support
-  fix(ui): Fix IME input interruption during terminal resize
-```
 
 ### Code Standards
 

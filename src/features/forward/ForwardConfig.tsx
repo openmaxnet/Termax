@@ -171,8 +171,8 @@ const ForwardRuleForm: React.FC<{
 
   const dirBtnClass = (d: ForwardDirection) =>
     direction === d
-      ? 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default) inline-flex items-center'
-      : 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) inline-flex items-center';
+      ? 'h-8 px-3 text-xs font-medium rounded-(--tx-radius-md) border border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default) inline-flex items-center gap-1.5'
+      : 'h-8 px-3 text-xs font-medium rounded-(--tx-radius-md) border border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) inline-flex items-center gap-1.5';
 
   return (
     <div className="flex flex-col gap-2.5">

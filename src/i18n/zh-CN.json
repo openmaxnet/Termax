@@ -442,6 +442,14 @@
     "confirmDelete": "确认删除",
     "fromCredential": "凭证库",
     "selectCredential": "选择凭证",
-    "noCredentials": "暂无凭证，请先在凭证管理中添加"
+    "noCredentials": "暂无凭证，请先在凭证管理中添加",
+    "selectKeyFile": "点击选择私钥文件…",
+    "keyImported": "已导入",
+    "reselect": "重新选择",
+    "filterAll": "全部",
+    "filterKey": "密钥",
+    "filterPassword": "密码",
+    "backToList": "返回列表",
+    "close": "关闭"
   }
 }

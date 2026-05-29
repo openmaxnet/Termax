@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use commands::config_cmd::{delete_config, delete_config_by_id, load_configs, save_config, update_config};
-use commands::credential_cmd::{list_credentials, save_credential, update_credential, delete_credential, get_credential_secret, check_credential_usage, pick_file};
+use commands::credential_cmd::{list_credentials, save_credential, update_credential, delete_credential, get_credential_secret, check_credential_usage, pick_file, pick_key_file};
 use commands::debug_cmd::save_log_file;
 use commands::edit_cmd::{sftp_start_edit, sftp_stop_edit, sftp_list_edits};
 use commands::sftp_cmd::{sftp_cancel_transfer, sftp_create_dir, sftp_delete_entry, sftp_download_chunked, sftp_download_file, sftp_download_to_downloads, sftp_get_stat, sftp_list_files, sftp_read_file, sftp_rename, sftp_upload_chunked, sftp_upload_file, sftp_write_file};
@@ -74,6 +74,7 @@ pub fn run() {
             get_credential_secret,
             check_credential_usage,
             pick_file,
+            pick_key_file,
             save_log_file,
             sftp_start_edit,
             sftp_stop_edit,

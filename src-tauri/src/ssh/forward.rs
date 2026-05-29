@@ -44,8 +44,8 @@ async fn connect_and_auth(config: &ConnectionConfig) -> Result<client::Handle<Fo
             .authenticate_password(&config.username, &pw)
             .await
             .map_err(|e| AppError::SshError(format!("认证失败: {}", e)))?,
-        credential_store::ResolvedAuth::Key { path, passphrase } => {
-            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
+        credential_store::ResolvedAuth::Key { key_content, passphrase } => {
+            let key = russh::keys::decode_secret_key(&key_content, passphrase.as_deref())
                 .map_err(|e| AppError::SshError(format!("密钥错误: {}", e)))?;
             let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
             handle

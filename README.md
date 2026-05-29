@@ -19,26 +19,31 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
 </p>
 
+<p align="center">
+  <img src=".github/asset/home.png" width="720" alt="Termax Screenshot">
+</p>
+
 ---
 
 ## 功能特性
 
 - **SSH 连接** — 密码认证 / 密钥认证
+- **SSH 凭证管理** — AES-256-GCM 加密存储，统一管理密钥与密码认证
+- **堡垒机 / 跳板机** — 通过跳板机代理连接目标服务器
+- **端口转发** — 本地 / 远程 / 动态端口转发
 - **多 Tab 终端** — 拖拽排序、右键菜单、一键重连
 - **SFTP 文件浏览器** — 上传 / 下载 / 分块传输进度 / 传输历史 / 取消传输
 - **本地终端** — Windows / macOS / Linux 本地 Shell + WSL 支持
 - **分屏** — 水平 / 垂直分屏，灵活切换
 - **广播输入** — 选择多个终端，同步发送键盘输入
 - **系统监控** — CPU / 内存 / 磁盘实时指标
+- **调试面板** — IPC 调用计时、FPS / 内存指标、结构化日志导出
 - **主题系统** — Termax Dark / Light、One Dark、Dracula，支持自定义扩展
 - **国际化** — 中文 / English
 - **应用内更新** — 基于 GitHub Releases 的版本检测与更新
 
 **即将推出：**
 
-- 端口转发（本地 / 远程 / 动态）
-- SSH Agent 转发
-- 堡垒机 / 跳板机
 - 命令片段
 - Android 移动端适配
 
@@ -64,31 +69,27 @@
 pnpm install
 ```
 
-### 开发模式
+### 开发与构建命令
 
-```bash
-pnpm dev
-```
-
-### 构建
-
-```bash
-# 构建前端 + Tauri 应用
-pnpm build
-
-# 仅构建前端
-pnpm preview
-```
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 启动开发模式（热重载） |
+| `pnpm build` | 构建前端（类型检查 + Vite 打包） |
+| `pnpm build:nsis` | 构建 Windows NSIS 安装包（`.exe`） |
+| `pnpm build:msi` | 构建 Windows MSI 安装包 |
+| `pnpm build:portable` | 构建 Windows 免安装便携版 |
+| `pnpm lint` | ESLint 代码检查 |
+| `pnpm gen:installer-assets` | 生成安装程序位图资源 |
 
 ## 下载安装
 
-从 [GitHub Releases](https://github.com/termax/termax/releases) 下载最新版本：
+从 [GitHub Releases](https://github.com/openmaxnet/Termax/releases) 下载最新版本：
 
-| 平台 | 格式 |
-|------|------|
-| Windows | `.exe` 安装包 |
-| macOS | `.dmg` |
-| Linux | `.deb` / `.AppImage` |
+| 平台 | 格式 | 状态 |
+|------|------|------|
+| Windows | `.exe` 安装包 / 便携版 | ✅ 已支持 |
+| macOS | `.dmg` | 🚧 即将支持 |
+| Linux | `.deb` / `.AppImage` | 🚧 即将支持 |
 
 ## 项目结构
 
@@ -101,13 +102,14 @@ Termax/
 │   │   ├── sftp/             # SFTP 文件操作
 │   │   ├── local/            # 本地终端 PTY
 │   │   ├── monitor/          # 系统监控
-│   │   └── storage/          # 持久化存储
+│   │   └── storage/          # 持久化存储（SQLite）
 │   └── Cargo.toml
 ├── src/                      # React 前端
 │   ├── app/                  # 应用外壳（TitleBar / Sidebar / StatusBar）
 │   ├── features/             # 功能模块
 │   │   ├── terminal/         # 终端
 │   │   ├── connection/       # 连接管理
+│   │   ├── credential/       # SSH 凭证管理
 │   │   ├── sftp/             # SFTP 文件浏览器
 │   │   ├── monitoring/       # 系统监控
 │   │   └── settings/         # 设置
@@ -122,19 +124,6 @@ Termax/
 ```
 
 ## 开发指南
-
-### Git 提交规范
-
-```
-<type>(<scope>): <简短中文描述>
-
-类型: feat | fix | refactor | style | docs | test | chore
-范围: rust | ui | tauri | config
-
-示例:
-  feat(rust): 添加 SSH 密钥认证支持
-  fix(ui): 修复终端 resize 时 IME 输入中断的问题
-```
 
 ### 代码规范
 

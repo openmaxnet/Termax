@@ -26,7 +26,7 @@ export interface BastionConfig {
 
 /** SSH 凭证类型：密钥认证或密码认证 */
 export type CredentialKind =
-  | { Key: { path: string; passphrase_stored: boolean } }
+  | { Key: { name: string; passphrase_stored: boolean } }
   | { Password: string };
 
 /** SSH 凭证：集中管理的认证信息 */
@@ -36,6 +36,8 @@ export interface SshCredential {
   kind: CredentialKind;
   /** AES-256-GCM 加密后的敏感数据，base64(nonce || ciphertext) */
   encrypted_secret?: string | null;
+  /** AES-256-GCM 加密后的私钥内容（仅密钥类型），base64(nonce || ciphertext) */
+  encrypted_key_content?: string | null;
   /** 是否已保存敏感信息 */
   has_secret: boolean;
   created_at: number;

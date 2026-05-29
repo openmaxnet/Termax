@@ -1,6 +1,7 @@
 /**
  * 凭证表单组件
  * 用于添加/编辑 SSH 凭证（密钥或密码），支持文件选择和标签输入
+ * 密钥认证：选择文件后读取内容加密存储，不再依赖文件路径
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from '@iconify/react';
@@ -24,7 +25,7 @@ interface CredentialFormProps {
   /** 编辑时传入已有凭证 */
   credential?: SshCredential | null;
   /** 保存回调 */
-  onSave: (cred: SshCredential, secret?: string) => void;
+  onSave: (cred: SshCredential, secret?: string, keyContent?: string) => void;
   /** 取消回调 */
   onCancel: () => void;
 }
@@ -36,7 +37,8 @@ export const CredentialForm: React.FC<CredentialFormProps> = ({ credential, onSa
   const { t } = useI18n();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<FormKind>('key');
-  const [keyPath, setKeyPath] = useState('');
+  const [keyFileName, setKeyFileName] = useState('');
+  const [keyContent, setKeyContent] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [password, setPassword] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -51,13 +53,17 @@ export const CredentialForm: React.FC<CredentialFormProps> = ({ credential, onSa
     setTagsInput(credential.tags.join(', '));
     if ('Key' in credential.kind) {
       setKind('key');
-      setKeyPath(credential.kind.Key.path);
+      // 显示原文件名（如果有的话）
+      setKeyFileName(credential.kind.Key.name || '');
+      // 有加密的私钥内容说明已导入
+      if (credential.encrypted_key_content) {
+        setKeyContent('__loaded__'); // 标记已加载，不传实际内容
+      }
     } else {
       setKind('password');
     }
-    // 直接从凭证元信息判断是否已保存敏感信息（不依赖密钥链读取）
     setHasExistingSecret(credential.has_secret);
-    // 尝试从密钥链加载实际值填入表单
+    // 加载密码短语/密码
     setLoading(true);
     ipc.credential.getSecret(credential.id).then((secret) => {
       if (secret) {
@@ -77,11 +83,11 @@ export const CredentialForm: React.FC<CredentialFormProps> = ({ credential, onSa
   const validate = useCallback(() => {
     const errs = new Set<string>();
     if (!name.trim()) errs.add('name');
-    if (kind === 'key' && !keyPath.trim()) errs.add('keyPath');
-    if (kind === 'password' && !password) errs.add('password');
+    if (kind === 'key' && !keyContent && !keyFileName) errs.add('keyPath');
+    if (kind === 'password' && !password && !hasExistingSecret) errs.add('password');
     setErrors(errs);
     return errs.size === 0;
-  }, [name, kind, keyPath, password]);
+  }, [name, kind, keyContent, keyFileName, password, hasExistingSecret]);
 
   const handleSave = () => {
     if (!validate()) return;
@@ -91,10 +97,15 @@ export const CredentialForm: React.FC<CredentialFormProps> = ({ credential, onSa
 
     let credKind: CredentialKind;
     let secret: string | undefined;
+    let keyContentToSave: string | undefined;
 
     if (kind === 'key') {
-      credKind = { Key: { path: keyPath, passphrase_stored: !!passphrase } };
+      credKind = { Key: { name: keyFileName, passphrase_stored: !!passphrase } };
       secret = passphrase || undefined;
+      // 如果是新选择的文件（不是 __loaded__ 标记），传实际内容
+      if (keyContent && keyContent !== '__loaded__') {
+        keyContentToSave = keyContent;
+      }
     } else {
       credKind = { Password: '' };
       secret = password || undefined;
@@ -110,19 +121,25 @@ export const CredentialForm: React.FC<CredentialFormProps> = ({ credential, onSa
       tags,
     };
 
-    onSave(cred, secret);
+    onSave(cred, secret, keyContentToSave);
   };
 
   const handleFileSelected = async () => {
-    const path = await ipc.credential.pickFile();
-    if (path) {
-      setKeyPath(path);
-      clearError('keyPath');
+    try {
+      const result = await ipc.credential.pickKeyFile();
+      if (result) {
+        const [fileName, content] = result;
+        setKeyFileName(fileName);
+        setKeyContent(content);
+        clearError('keyPath');
+      }
+    } catch (e) {
+      console.error('选择密钥文件失败:', e);
     }
   };
 
   const kindBtnClass = (type: FormKind) => cn(
-    'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border transition-colors inline-flex items-center gap-1.5',
+    'h-8 px-3 text-xs font-medium rounded-(--tx-radius-md) border transition-colors inline-flex items-center gap-1.5',
     kind === type
       ? 'border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default)'
       : 'border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) hover:text-(--tx-text-primary)',
@@ -167,20 +184,42 @@ export const CredentialForm: React.FC<CredentialFormProps> = ({ credential, onSa
       {kind === 'key' && (
         <>
           <Row label={t('credential.keyPath')}>
-            <div className="relative flex-1">
-              <Input
-                value={keyPath}
-                onChange={(e) => { setKeyPath(e.target.value); clearError('keyPath'); }}
-                placeholder="~/.ssh/id_rsa"
-                className={cn('pr-8', errors.has('keyPath') && 'border-(--tx-red)')}
-              />
-              <button
-                type="button"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-(--tx-bg-hover)"
-                onClick={handleFileSelected}
-              >
-                <Icon icon="solar:folder-linear" className="text-sm text-(--tx-text-tertiary)" />
-              </button>
+            <div className="flex items-center gap-2 flex-1">
+              {keyFileName ? (
+                <div className={cn(
+                  'flex items-center gap-1.5 flex-1 h-8 px-2.5 rounded-(--tx-radius-sm) text-xs',
+                  'border border-(--tx-border-light) bg-(--tx-bg-base)',
+                  errors.has('keyPath') && 'border-(--tx-red)',
+                )}>
+                  <Icon icon="solar:key-linear" width={14} height={14} color="var(--tx-accent-default)" className="shrink-0" />
+                  <span className="truncate">{keyFileName}</span>
+                  <span className="shrink-0 text-(--tx-green) text-[10px]">{t('credential.keyImported')}</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleFileSelected}
+                  className={cn(
+                    'flex items-center gap-1.5 flex-1 h-8 px-2.5 rounded-(--tx-radius-sm) text-xs cursor-pointer',
+                    'border border-dashed border-(--tx-border-default) text-(--tx-text-tertiary)',
+                    'hover:border-(--tx-accent-default) hover:text-(--tx-accent-default) hover:bg-(--tx-accent-muted) transition-colors',
+                    errors.has('keyPath') && 'border-(--tx-red)',
+                  )}
+                >
+                  <Icon icon="solar:upload-minimalistic-linear" width={14} height={14} />
+                  {t('credential.selectKeyFile')}
+                </button>
+              )}
+              {keyFileName && (
+                <button
+                  type="button"
+                  onClick={handleFileSelected}
+                  className="shrink-0 p-1.5 rounded-(--tx-radius-sm) text-(--tx-text-tertiary) hover:text-(--tx-accent-default) hover:bg-(--tx-bg-hover) transition-colors"
+                  title={t('credential.reselect')}
+                >
+                  <Icon icon="solar:refresh-linear" width={14} height={14} />
+                </button>
+              )}
             </div>
           </Row>
           <Row label={t('credential.passphrase')}>

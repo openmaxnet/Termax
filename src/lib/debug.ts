@@ -3,6 +3,7 @@
  * 提供结构化日志记录、IPC 计时、性能指标采集。
  * debugMode=false 时所有函数直接 return，零开销。
  */
+import { ipc } from '@/lib/ipc';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 // ═══ 类型定义 ═══
@@ -193,7 +194,6 @@ export async function exportLogs(): Promise<void> {
   const json = JSON.stringify(data, null, 2);
 
   try {
-    const { ipc } = await import('@/lib/ipc');
     const savedPath = await ipc.debug.saveLogFile(json);
     console.log(`[Termax Debug] 日志已导出: ${savedPath}`);
   } catch (e) {

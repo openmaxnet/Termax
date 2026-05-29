@@ -181,8 +181,8 @@ const BastionForm: React.FC<{
 
   const authBtnClass = (at: AuthType) =>
     authType === at
-      ? 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default) inline-flex items-center gap-1'
-      : 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) inline-flex items-center gap-1';
+      ? 'h-8 px-3 text-xs font-medium rounded-(--tx-radius-md) border border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default) inline-flex items-center gap-1.5'
+      : 'h-8 px-3 text-xs font-medium rounded-(--tx-radius-md) border border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) inline-flex items-center gap-1.5';
 
   const credOptions = credentials.map((c) => ({
     value: c.id,

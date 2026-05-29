@@ -441,6 +441,14 @@
     "confirmDelete": "Delete",
     "fromCredential": "Credential",
     "selectCredential": "Select credential",
-    "noCredentials": "No credentials yet. Add one in Credential Manager first."
+    "noCredentials": "No credentials yet. Add one in Credential Manager first.",
+    "selectKeyFile": "Click to select key file…",
+    "keyImported": "Imported",
+    "reselect": "Reselect",
+    "filterAll": "All",
+    "filterKey": "Keys",
+    "filterPassword": "Passwords",
+    "backToList": "Back to list",
+    "close": "Close"
   }
 }

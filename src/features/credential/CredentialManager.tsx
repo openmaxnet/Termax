@@ -1,7 +1,7 @@
 /**
  * 凭证管理器对话框
  * 集中管理 SSH 凭证（密钥和密码），支持搜索、添加、编辑、删除
- * 布局与 ConnectionManager 保持一致：可拖拽/缩放的 overlay 对话框
+ * 布局与 ConnectionManager / SettingsDialog 一致：左侧导航 + 右侧内容面板
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '@iconify/react';
@@ -14,7 +14,6 @@ import {
 import {
   ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { ipc } from '@/lib/ipc';
 import { useI18n } from '@/i18n';
 import type { SshCredential } from '@/lib/ipc';
@@ -25,6 +24,19 @@ interface CredentialManagerProps {
   onClose: () => void;
 }
 
+/** 筛选分类 ID */
+type FilterId = 'all' | 'key' | 'password';
+
+/** 筛选分类定义 */
+interface FilterCategory { id: FilterId; icon: string; labelKey: string; }
+
+/** 左侧导航筛选标签 */
+const FILTER_CATEGORIES: FilterCategory[] = [
+  { id: 'all', icon: 'solar:shield-keyhole-minimalistic-broken', labelKey: 'credential.filterAll' },
+  { id: 'key', icon: 'solar:key-linear', labelKey: 'credential.filterKey' },
+  { id: 'password', icon: 'solar:lock-keyhole-linear', labelKey: 'credential.filterPassword' },
+];
+
 /** 格式化日期 */
 function formatDate(ts: number): string {
   if (!ts) return '';
@@ -32,7 +44,7 @@ function formatDate(ts: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** 凭证类型标签 — 与设置页标签风格一致 */
+/** 凭证类型标签 */
 function KindBadge({ kind }: { kind: SshCredential['kind'] }) {
   const { t } = useI18n();
   const isKey = 'Key' in kind;
@@ -52,7 +64,7 @@ function KindBadge({ kind }: { kind: SshCredential['kind'] }) {
   );
 }
 
-/** 标签 chips — 与设置页标签风格一致 */
+/** 标签 chips */
 function TagsChips({ tags }: { tags: string[] }) {
   if (!tags.length) return null;
   return (
@@ -80,6 +92,7 @@ export const CredentialManager: React.FC<CredentialManagerProps> = ({ open, onCl
   const { t } = useI18n();
   const [credentials, setCredentials] = useState<SshCredential[]>([]);
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterId>('all');
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<SshCredential | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SshCredential | null>(null);
@@ -102,25 +115,30 @@ export const CredentialManager: React.FC<CredentialManagerProps> = ({ open, onCl
     if (open) loadCredentials();
   }, [open, loadCredentials]);
 
+  // 按筛选分类 + 搜索关键词过滤
   const filtered = credentials.filter((c) => {
+    // 按分类筛选
+    if (activeFilter === 'key' && !('Key' in c.kind)) return false;
+    if (activeFilter === 'password' && !('Password' in c.kind)) return false;
+    // 按搜索关键词筛选
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
       c.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-      ('Key' in c.kind && c.kind.Key.path.toLowerCase().includes(q))
+      ('Key' in c.kind && c.kind.Key.name.toLowerCase().includes(q))
     );
   });
 
   const handleAdd = () => { setEditTarget(null); setShowForm(true); };
   const handleEdit = (cred: SshCredential) => { setEditTarget(cred); setShowForm(true); };
 
-  const handleSave = async (cred: SshCredential, secret?: string) => {
+  const handleSave = async (cred: SshCredential, secret?: string, keyContent?: string) => {
     try {
       if (editTarget) {
-        await ipc.credential.update(editTarget.id, cred, secret);
+        await ipc.credential.update(editTarget.id, cred, secret, keyContent);
       } else {
-        await ipc.credential.save(cred, secret);
+        await ipc.credential.save(cred, secret, keyContent);
       }
       setShowForm(false);
       setEditTarget(null);
@@ -157,8 +175,10 @@ export const CredentialManager: React.FC<CredentialManagerProps> = ({ open, onCl
 
   return (
     <>
-      <div style={overlayStyle}>
-        <div style={{ ...dialogStyle, ...(dialogSize ? { width: dialogSize.w, height: dialogSize.h } : {}), ...(dialogPos ? { position: 'fixed', top: dialogPos.top, left: dialogPos.left, transform: 'none' } : {}) }}>
+      {/* 遮罩层 — 点击关闭 */}
+      <div onClick={onClose} style={overlayStyle}>
+        <div onClick={(e) => e.stopPropagation()} style={{ ...dialogStyle, ...(dialogSize ? { width: dialogSize.w, height: dialogSize.h } : {}), ...(dialogPos ? { position: 'fixed', top: dialogPos.top, left: dialogPos.left, transform: 'none' } : {}) }}>
+
           {/* Header — 可拖拽 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', cursor: 'grab', userSelect: 'none' }}
             onMouseDown={(e) => {
@@ -178,82 +198,124 @@ export const CredentialManager: React.FC<CredentialManagerProps> = ({ open, onCl
             <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--tx-text-primary)', flex: 1 }}>
               {t('credential.title')}
             </h2>
-            <button onClick={onClose}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--tx-text-tertiary)', borderRadius: 'var(--tx-radius-sm)', transition: 'color 0.12s, background 0.12s' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tx-text-primary)'; e.currentTarget.style.background = 'var(--tx-bg-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--tx-text-tertiary)'; e.currentTarget.style.background = 'none'; }}
-            >
-              <Icon icon="solar:close-circle-linear" width={18} height={18} />
-            </button>
           </div>
 
-          {/* 列表区域（含顶部搜索和添加按钮） */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            {/* 搜索栏 — 样式对齐 QuickPanel */}
-            <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--tx-border-light)', display: 'flex', alignItems: 'center', gap: 6, position: 'sticky', top: 0, zIndex: 1, background: 'var(--tx-bg-elevated)' }}>
-              <div className="flex items-center gap-1.5 bg-(--tx-bg-base) rounded-(--tx-radius-md) px-2.5 py-1 border border-(--tx-border-light) focus-within:border-(--tx-border-focus) focus-within:ring-2 focus-within:ring-(--tx-border-focus)/20 transition-colors" style={{ flex: 1 }}>
-                <Icon icon="solar:magnifer-linear" width={14} height={14} color="var(--tx-text-tertiary)" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('credential.search')}
-                  className="flex-1 h-7 border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:outline-none text-xs" />
-              </div>
-              <Button onClick={handleAdd} className="rounded-(--tx-radius-sm)">
-                <Icon icon="solar:add-circle-linear" className="text-sm" />
-                {t('credential.add')}
-              </Button>
-            </div>
-            {filtered.length === 0 ? (
-              <div style={{ padding: '48px 0' }}>
-                <Empty>
-                  <EmptyMedia>
-                    <Icon icon="solar:shield-keyhole-minimalistic-broken" className="text-3xl text-(--tx-text-tertiary)" />
-                  </EmptyMedia>
-                  <EmptyHeader>
-                    <EmptyTitle className="text-xs text-(--tx-text-tertiary)">
-                      {search ? t('credential.noMatch') : t('credential.empty')}
-                    </EmptyTitle>
-                  </EmptyHeader>
-                </Empty>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', padding: 2 }}>
-                {filtered.map((cred) => (
-                  <ContextMenu key={cred.id}>
-                    <ContextMenuTrigger className="block">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', fontSize: 13, borderRadius: 'var(--tx-radius-md)', cursor: 'default', transition: 'background 0.12s', minHeight: 36 }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--tx-bg-hover)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <Icon icon={'Key' in cred.kind ? 'solar:shield-keyhole-minimalistic-broken' : 'solar:lock-keyhole-linear'} width={16} height={16} color="var(--tx-text-tertiary)" className="shrink-0" />
-                        <span className="truncate min-w-0 flex-1" style={{ color: 'var(--tx-text-primary)' }}>{cred.name}</span>
-                        <KindBadge kind={cred.kind} />
-                        <TagsChips tags={cred.tags} />
-                        <span className="shrink-0" style={{ fontSize: 11, color: 'var(--tx-text-tertiary)', width: 64, textAlign: 'right' }}>{formatDate(cred.updated_at)}</span>
+          {/* Body — 左侧导航 + 右侧内容 */}
+          <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+            {/* 左侧导航 — 与 ConnectionManager 一致 */}
+            <nav style={{ width: 120, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: '8px', borderRight: '1px solid var(--tx-border-light)' }}>
+              {FILTER_CATEGORIES.map((cat) => (
+                <button key={cat.id} onClick={() => { setActiveFilter(cat.id); setSearch(''); setShowForm(false); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '7px 8px',
+                    border: 'none', borderRadius: 'var(--tx-radius-sm)',
+                    background: activeFilter === cat.id ? 'var(--tx-accent-muted)' : 'transparent',
+                    color: activeFilter === cat.id ? 'var(--tx-accent-default)' : 'var(--tx-text-secondary)',
+                    cursor: 'pointer', fontSize: 12, fontWeight: activeFilter === cat.id ? 500 : 400,
+                    textAlign: 'left', transition: 'all 0.12s',
+                  }}
+                  onMouseEnter={(e) => { if (activeFilter !== cat.id) e.currentTarget.style.background = 'var(--tx-bg-hover)'; }}
+                  onMouseLeave={(e) => { if (activeFilter !== cat.id) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <Icon icon={cat.icon} width={15} height={15} />
+                  {t(cat.labelKey)}
+                </button>
+              ))}
+            </nav>
+
+            {/* 右侧内容区域 */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              {showForm ? (
+                /* ── 编辑/添加表单视图 ── */
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderBottom: '1px solid var(--tx-border-light)' }}>
+                    <button onClick={() => { setShowForm(false); setEditTarget(null); }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: 'var(--tx-text-secondary)', fontSize: 12, borderRadius: 'var(--tx-radius-sm)', transition: 'color 0.12s, background 0.12s' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tx-accent-default)'; e.currentTarget.style.background = 'var(--tx-bg-hover)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--tx-text-secondary)'; e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <Icon icon="solar:arrow-left-linear" width={14} height={14} />
+                      {t('credential.backToList')}
+                    </button>
+                    <span style={{ fontSize: 12, color: 'var(--tx-text-tertiary)' }}>
+                      {editTarget ? t('credential.edit') : t('credential.add')}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1, padding: '12px 16px', overflowY: 'auto' }}>
+                    <CredentialForm
+                      credential={editTarget}
+                      onSave={handleSave}
+                      onCancel={() => { setShowForm(false); setEditTarget(null); }}
+                    />
+                  </div>
+                </>
+              ) : (
+                /* ── 列表视图 ── */
+                <>
+                  {/* 搜索栏 */}
+                  <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--tx-border-light)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="flex items-center gap-1.5 bg-(--tx-bg-base) rounded-(--tx-radius-md) px-2.5 py-1 border border-(--tx-border-light) focus-within:border-(--tx-border-focus) focus-within:ring-2 focus-within:ring-(--tx-border-focus)/20 transition-colors" style={{ flex: 1 }}>
+                      <Icon icon="solar:magnifer-linear" width={14} height={14} color="var(--tx-text-tertiary)" />
+                      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('credential.search')}
+                        className="flex-1 h-7 border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:outline-none text-xs" />
+                    </div>
+                  </div>
+
+                  {/* 凭证列表 */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: 2 }}>
+                    {filtered.length === 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--tx-text-tertiary)', fontSize: 12 }}>
+                        {search ? t('credential.noMatch') : t('credential.empty')}
                       </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem onClick={() => handleEdit(cred)}>
-                        <Icon icon="solar:pen-linear" className="mr-2 text-xs" />
-                        {t('credential.edit')}
-                      </ContextMenuItem>
-                      <ContextMenuItem onClick={() => handleDeleteCheck(cred)} className="text-(--tx-red) focus:text-(--tx-red)">
-                        <Icon icon="solar:trash-bin-trash-linear" className="mr-2 text-xs" />
-                        {t('credential.delete')}
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                ))}
-              </div>
-            )}
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {filtered.map((cred) => (
+                          <ContextMenu key={cred.id}>
+                            <ContextMenuTrigger className="block">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', fontSize: 13, borderRadius: 'var(--tx-radius-md)', cursor: 'default', transition: 'background 0.12s', minHeight: 36 }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--tx-bg-hover)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                              >
+                                <Icon icon={'Key' in cred.kind ? 'solar:shield-keyhole-minimalistic-broken' : 'solar:lock-keyhole-linear'} width={16} height={16} color="var(--tx-text-tertiary)" className="shrink-0" />
+                                <span className="truncate min-w-0 flex-1" style={{ color: 'var(--tx-text-primary)' }}>{cred.name}</span>
+                                <KindBadge kind={cred.kind} />
+                                <TagsChips tags={cred.tags} />
+                                <span className="shrink-0" style={{ fontSize: 11, color: 'var(--tx-text-tertiary)', width: 64, textAlign: 'right' }}>{formatDate(cred.updated_at)}</span>
+                              </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem onClick={() => handleEdit(cred)}>
+                                <Icon icon="solar:pen-linear" className="mr-2 text-xs" />
+                                {t('credential.edit')}
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => handleDeleteCheck(cred)} className="text-(--tx-red) focus:text-(--tx-red)">
+                                <Icon icon="solar:trash-bin-trash-linear" className="mr-2 text-xs" />
+                                {t('credential.delete')}
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* 底部状态栏 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', borderTop: '1px solid var(--tx-border-light)', flexShrink: 0 }}>
-            <span style={{ fontSize: 10, color: 'var(--tx-text-tertiary)' }}>
+          {/* 底部栏 — 与 ConnectionManager 一致 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', padding: '10px 16px', borderTop: '1px solid var(--tx-border-light)', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'var(--tx-text-tertiary)', marginRight: 'auto' }}>
               {t('credential.totalCount', { count: credentials.length })}
             </span>
+            <Button variant="outline" onClick={onClose}>{t('credential.close')}</Button>
+            <Button onClick={handleAdd} disabled={showForm}>
+              <Icon icon="solar:add-circle-linear" className="text-sm" />
+              {t('credential.add')}
+            </Button>
           </div>
 
-          {/* Resize handles */}
+          {/* Resize handles — 与其他弹窗一致 */}
           {(['n','s','e','w','ne','nw','se','sw'] as const).map((dir) => (
             <div key={dir} onMouseDown={(e) => {
               e.preventDefault();
@@ -292,27 +354,6 @@ export const CredentialManager: React.FC<CredentialManagerProps> = ({ open, onCl
         </div>
       </div>
 
-      {/* 添加/编辑表单 */}
-      {showForm && (
-        <div style={overlayStyle}>
-          <div style={{ ...dialogStyle, width: 420, height: 'auto', maxHeight: '85vh' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--tx-border-light)' }}>
-              <Icon icon={editTarget ? 'solar:pen-linear' : 'solar:add-circle-linear'} width={18} height={18} color="var(--tx-accent-default)" />
-              <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--tx-text-primary)', flex: 1 }}>
-                {editTarget ? t('credential.edit') : t('credential.add')}
-              </h2>
-            </div>
-            <div style={{ padding: '12px 16px', overflowY: 'auto' }}>
-              <CredentialForm
-                credential={editTarget}
-                onSave={handleSave}
-                onCancel={() => { setShowForm(false); setEditTarget(null); }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 删除确认 */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) { setDeleteTarget(null); setDeleteUsage([]); } }}>
         <AlertDialogContent size="sm">
@@ -343,12 +384,14 @@ export const CredentialManager: React.FC<CredentialManagerProps> = ({ open, onCl
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, background: 'var(--tx-bg-overlay)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, animation: 'fadeIn 0.15s',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  zIndex: 50, animation: 'fadeIn 0.15s',
 };
 
 const dialogStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', position: 'relative',
-  width: 560, maxWidth: '92vw', height: 460, maxHeight: '85vh',
+  display: 'flex', flexDirection: 'column',
+  width: 600, maxWidth: '92vw', height: 500, maxHeight: '85vh',
   background: 'var(--tx-bg-elevated)', border: '1px solid var(--tx-border-light)',
-  borderRadius: 'var(--tx-radius-lg)', boxShadow: 'var(--tx-shadow-lg)', animation: 'scaleIn 0.15s',
+  borderRadius: 'var(--tx-radius-lg)', boxShadow: 'var(--tx-shadow-lg)',
+  animation: 'scaleIn 0.15s', position: 'relative',
 };

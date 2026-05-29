@@ -37,7 +37,7 @@ export const ProxyConfig: React.FC<ProxyConfigProps> = ({ value, onChange }) => 
   };
 
   const typeBtnClass = (pt: ProxyType) => cn(
-    'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border transition-colors inline-flex items-center',
+    'h-8 px-3 text-xs font-medium rounded-(--tx-radius-md) border transition-colors inline-flex items-center gap-1.5',
     type === pt
       ? 'border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default)'
       : 'border-(--tx-border-light) bg-transparent text-(--tx-text-secondary)',
