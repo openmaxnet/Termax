@@ -5,6 +5,7 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 import type { FontInfo } from '@/lib/fonts';
 
 /** 设置分组容器：label + 子项 */
@@ -17,17 +18,22 @@ export const Section: React.FC<{ label: string; children: React.ReactNode }> = (
   </div>
 );
 
-/** Select 包装（value 安全兜底，显示当前选中项文本） */
+/** Select 包装（value 安全兜底，显示当前选中项文本，无选项时显示空状态） */
 export const Sel: React.FC<{ value: string | undefined; options: { value: string; label: string }[]; onChange: (v: string) => void }> = ({ value, options, onChange }) => {
+  const { t } = useI18n();
   const safeValue = value ?? '';
   const label = options.find(o => o.value === safeValue)?.label ?? '';
   return (
     <Select value={safeValue} onValueChange={onChange}>
       <SelectTrigger>
-        <span className={cn("flex-1 text-left", !safeValue && "text-muted-foreground")}>{label || ' '}</span>
+        <span className={cn("flex-1 text-left text-xs", !safeValue && "text-muted-foreground")}>{label || ' '}</span>
       </SelectTrigger>
       <SelectContent>
-        {options.map((opt) => (
+        {options.length === 0 ? (
+          <div style={{ padding: '12px 10px', fontSize: 12, color: 'var(--tx-text-tertiary)', textAlign: 'center', userSelect: 'none' }}>
+            {t('credential.noCredentials')}
+          </div>
+        ) : options.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
         ))}
       </SelectContent>

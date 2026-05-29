@@ -10,6 +10,7 @@ use tokio::sync::watch;
 
 use super::config::{AuthMethod, BastionConfig, ConnectionConfig};
 use crate::error::{AppError, CmdResult};
+use crate::storage::credential_store;
 
 /// Commands sent from Tauri commands to the session task
 #[derive(Debug)]
@@ -68,35 +69,63 @@ async fn connect_and_auth(
     auth: &AuthMethod,
     username: &str,
 ) -> Result<client::Handle<SshHandler>, AppError> {
+    log::info!("[connect_and_auth] 开始连接 {}:{}@{}:{} 认证方式={:?}", username, "***", host, port, auth);
+
     let cfg = Arc::new(client::Config::default());
     let mut handle = client::connect(cfg, (host, port), SshHandler)
         .await
         .map_err(|e| AppError::SshError(format!("连接失败: {}", e)))?;
 
-    match auth {
-        AuthMethod::Password(pw) => {
+    log::info!("[connect_and_auth] TCP 连接已建立，开始解析认证信息");
+
+    // 解析认证信息（支持内嵌和凭证引用）
+    let resolved = credential_store::resolve_auth(auth).map_err(|e| {
+        log::error!("[connect_and_auth] 认证解析失败: {}", e);
+        e
+    })?;
+
+    log::info!("[connect_and_auth] 认证信息解析完成: {:?}", resolved);
+
+    match resolved {
+        credential_store::ResolvedAuth::Password(pw) => {
+            log::info!("[connect_and_auth] 使用密码认证 (长度={})", pw.len());
             let result = handle
-                .authenticate_password(username, pw)
+                .authenticate_password(username, &pw)
                 .await
                 .map_err(|e| AppError::SshError(format!("认证错误: {}", e)))?;
             if !result.success() {
+                log::warn!("[connect_and_auth] 密码认证被服务器拒绝");
                 return Err(AppError::AuthFailed);
             }
         }
-        AuthMethod::Key { path, passphrase } => {
-            let key = russh::keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| AppError::SshError(format!("密钥错误: {}", e)))?;
+        credential_store::ResolvedAuth::Key { path, passphrase } => {
+            log::info!(
+                "[connect_and_auth] 使用密钥认证 path={} passphrase={}",
+                path,
+                if passphrase.is_some() { "已提供" } else { "无" }
+            );
+            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
+                .map_err(|e| {
+                    log::error!("[connect_and_auth] 密钥加载失败 path={}: {}", path, e);
+                    AppError::SshError(format!("密钥错误: {}", e))
+                })?;
+            log::info!("[connect_and_auth] 密钥加载成功，开始公钥认证");
             let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
             let result = handle
                 .authenticate_publickey(username, kh)
                 .await
-                .map_err(|e| AppError::SshError(format!("认证错误: {}", e)))?;
+                .map_err(|e| {
+                    log::error!("[connect_and_auth] 公钥认证错误: {}", e);
+                    AppError::SshError(format!("认证错误: {}", e))
+                })?;
             if !result.success() {
+                log::warn!("[connect_and_auth] 公钥认证被服务器拒绝");
                 return Err(AppError::AuthFailed);
             }
         }
     }
 
+    log::info!("[connect_and_auth] 认证成功");
     Ok(handle)
 }
 
@@ -290,6 +319,11 @@ async fn run_session(
 ///
 /// 内部完成 TCP 连接、密钥交换和用户认证全流程，10 秒超时。
 pub async fn test_connection(config: &ConnectionConfig) -> CmdResult<String> {
+    log::info!(
+        "[test_connection] 开始测试连接 {}@{}:{} auth_method={:?}",
+        config.username, config.host, config.port, config.auth_method
+    );
+
     struct TestHandler;
     impl client::Handler for TestHandler {
         type Error = anyhow::Error;
@@ -306,28 +340,54 @@ pub async fn test_connection(config: &ConnectionConfig) -> CmdResult<String> {
                 .await
                 .map_err(|e| AppError::SshError(format!("连接失败: {}", e)))?;
 
-            match &config.auth_method {
-                AuthMethod::Password(pw) => {
-                    let result = handle.authenticate_password(&config.username, pw)
+            log::info!("[test_connection] TCP 连接已建立，解析认证信息");
+
+            // 解析认证信息（支持内嵌和凭证引用）
+            let resolved = credential_store::resolve_auth(&config.auth_method).map_err(|e| {
+                log::error!("[test_connection] 认证解析失败: {}", e);
+                e
+            })?;
+
+            log::info!("[test_connection] 认证信息解析完成: {:?}", resolved);
+
+            match resolved {
+                credential_store::ResolvedAuth::Password(pw) => {
+                    log::info!("[test_connection] 使用密码认证 (长度={})", pw.len());
+                    let result = handle.authenticate_password(&config.username, &pw)
                         .await
                         .map_err(|e| AppError::SshError(format!("认证错误: {}", e)))?;
                     if !result.success() {
+                        log::warn!("[test_connection] 密码认证被服务器拒绝");
                         return Err(AppError::AuthFailed);
                     }
                 }
-                AuthMethod::Key { path, passphrase } => {
-                    let key = russh::keys::load_secret_key(path, passphrase.as_deref())
-                        .map_err(|e| AppError::SshError(format!("密钥错误: {}", e)))?;
+                credential_store::ResolvedAuth::Key { path, passphrase } => {
+                    log::info!(
+                        "[test_connection] 使用密钥认证 path={} passphrase={}",
+                        path,
+                        if passphrase.is_some() { "已提供" } else { "无" }
+                    );
+                    let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
+                        .map_err(|e| {
+                            log::error!("[test_connection] 密钥加载失败 path={}: {}", path, e);
+                            AppError::SshError(format!("密钥错误: {}", e))
+                        })?;
+                    log::info!("[test_connection] 密钥加载成功，开始公钥认证");
                     let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
                     let result = handle.authenticate_publickey(&config.username, kh)
                         .await
-                        .map_err(|e| AppError::SshError(format!("认证错误: {}", e)))?;
+                        .map_err(|e| {
+                            log::error!("[test_connection] 公钥认证错误: {}", e);
+                            AppError::SshError(format!("认证错误: {}", e))
+                        })?;
                     if !result.success() {
+                        log::warn!("[test_connection] 公钥认证被服务器拒绝");
                         return Err(AppError::AuthFailed);
                     }
                 }
             }
 
+            log::info!("[test_connection] 认证成功，连接测试通过");
             drop(handle);
             Ok(())
         },

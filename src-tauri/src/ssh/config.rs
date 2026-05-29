@@ -49,7 +49,7 @@ pub struct ProxyConfig {
     pub password: Option<String>,
 }
 
-/// SSH 认证方式：密码认证或密钥认证
+/// SSH 认证方式：密码认证、密钥认证或引用凭证管理器中的凭证
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AuthMethod {
     Password(String),
@@ -57,6 +57,8 @@ pub enum AuthMethod {
         path: String,
         passphrase: Option<String>,
     },
+    /// 通过凭证 ID 引用已保存的凭证
+    Credential(String),
 }
 
 /// 端口转发方向

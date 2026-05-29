@@ -26,6 +26,10 @@ pub enum AppError {
     Internal(String),
     #[error("传输已取消")]
     Cancelled,
+    #[error("凭证未找到: {0}")]
+    CredentialNotFound(String),
+    #[error("加密错误: {0}")]
+    CryptoError(String),
 }
 
 impl From<std::io::Error> for AppError {

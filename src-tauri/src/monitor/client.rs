@@ -8,6 +8,7 @@ use russh_sftp::client::SftpSession;
 use crate::error::{AppError, CmdResult};
 
 use crate::ssh::config::ConnectionConfig;
+use crate::storage::credential_store;
 
 use super::parser::{self, SystemInfo};
 
@@ -34,13 +35,16 @@ async fn connect_and_auth(
         .await
         .map_err(|e| AppError::SshError(format!("SSH 连接失败: {}", e)))?;
 
-    let result = match &config.auth_method {
-        crate::ssh::config::AuthMethod::Password(pw) => handle
-            .authenticate_password(&config.username, pw)
+    // 解析认证信息（支持内嵌和凭证引用）
+    let resolved = credential_store::resolve_auth(&config.auth_method)?;
+
+    let result = match resolved {
+        credential_store::ResolvedAuth::Password(pw) => handle
+            .authenticate_password(&config.username, &pw)
             .await
             .map_err(|e| AppError::SshError(format!("认证失败: {}", e)))?,
-        crate::ssh::config::AuthMethod::Key { path, passphrase } => {
-            let key = russh::keys::load_secret_key(path, passphrase.as_deref())
+        credential_store::ResolvedAuth::Key { path, passphrase } => {
+            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
                 .map_err(|e| AppError::SshError(format!("密钥错误: {}", e)))?;
             let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
             handle
@@ -218,13 +222,17 @@ pub async fn exec_command(config: &ConnectionConfig, command: &str) -> CmdResult
         .await
         .map_err(|e| AppError::MonitorError(format!("连接失败: {}", e)))?;
 
-    let result = match &config.auth_method {
-        crate::ssh::config::AuthMethod::Password(pw) => handle
-            .authenticate_password(&config.username, pw)
+    // 解析认证信息（支持内嵌和凭证引用）
+    let resolved = credential_store::resolve_auth(&config.auth_method)
+        .map_err(|e| AppError::MonitorError(e.to_string()))?;
+
+    let result = match resolved {
+        credential_store::ResolvedAuth::Password(pw) => handle
+            .authenticate_password(&config.username, &pw)
             .await
             .map_err(|e| AppError::MonitorError(format!("认证失败: {}", e)))?,
-        crate::ssh::config::AuthMethod::Key { path, passphrase } => {
-            let key = russh::keys::load_secret_key(path, passphrase.as_deref())
+        credential_store::ResolvedAuth::Key { path, passphrase } => {
+            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
                 .map_err(|e| AppError::MonitorError(format!("密钥错误: {}", e)))?;
             let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
             handle

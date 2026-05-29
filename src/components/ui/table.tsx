@@ -3,9 +3,10 @@ import { cn } from "@/lib/utils"
 
 function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-auto">
+    <div className="w-full overflow-auto px-1">
       <table
-        className={cn("w-full caption-bottom text-sm table-fixed", className)}
+        className={cn("w-full caption-bottom text-sm table-fixed border-separate", className)}
+        style={{ borderSpacing: '0 4px' }}
         {...props}
       />
     </div>
@@ -24,7 +25,7 @@ function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElem
   return (
     <tr
       className={cn(
-        "border-b border-(--tx-border-light) transition-colors hover:bg-(--tx-bg-hover) data-[state=selected]:bg-(--tx-bg-active)",
+        "transition-colors hover:bg-(--tx-bg-hover) data-[state=selected]:bg-(--tx-bg-active) [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
         className
       )}
       {...props}
@@ -36,7 +37,7 @@ function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
   return (
     <th
       className={cn(
-        "h-8 px-2 text-left align-middle text-[10px] font-semibold text-(--tx-text-tertiary) uppercase tracking-[0.5px] select-none has-[[role=checkbox]]:pr-0",
+        "h-9 px-3 text-left align-middle text-[10px] font-semibold text-(--tx-text-tertiary) uppercase tracking-[0.5px] select-none has-[[role=checkbox]]:pr-0",
         className
       )}
       {...props}
@@ -47,7 +48,7 @@ function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
 function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
     <td
-      className={cn("px-2 py-1 align-middle has-[[role=checkbox]]:pr-0", className)}
+      className={cn("px-3 py-2 align-middle has-[[role=checkbox]]:pr-0", className)}
       {...props}
     />
   )

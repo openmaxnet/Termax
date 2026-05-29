@@ -1,74 +1,123 @@
-use std::path::PathBuf;
+//! 连接配置持久化存储层
+//! 使用 SQLite 数据库替代原有的 configs.json 文件，支持事务性读写。
 
 use crate::ssh::config::ConnectionConfig;
+use crate::storage::db;
 
-/// 连接配置文件名
-const CONFIG_FILE: &str = "configs.json";
-
-/// 返回配置目录路径（<data_dir>/Termax/），不存在则创建
-fn config_dir() -> PathBuf {
-    let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
-    let dir = base.join("Termax");
-    std::fs::create_dir_all(&dir).ok();
-    dir
-}
-
-/// 返回配置文件完整路径
-fn config_path() -> PathBuf {
-    config_dir().join(CONFIG_FILE)
-}
-
-/// 从 JSON 文件加载所有连接配置，文件不存在时返回空列表
+/// 加载所有连接配置
 pub fn load() -> Vec<ConnectionConfig> {
-    let path = config_path();
-    let content = match std::fs::read_to_string(&path) {
+    let conn = match db::get_connection() {
         Ok(c) => c,
-        Err(_) => return Vec::new(),
+        Err(e) => {
+            log::error!("[store] 数据库连接失败: {}", e);
+            return Vec::new();
+        }
     };
-    serde_json::from_str(&content).unwrap_or_default()
+    let mut stmt = match conn.prepare("SELECT data FROM configs") {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("[store] 查询失败: {}", e);
+            return Vec::new();
+        }
+    };
+    let rows = match stmt.query_map([], |row| row.get::<_, String>(0)) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("[store] 查询迭代失败: {}", e);
+            return Vec::new();
+        }
+    };
+    rows.filter_map(|r| r.ok())
+        .filter_map(|data| serde_json::from_str::<ConnectionConfig>(&data).ok())
+        .collect()
 }
 
-/// 将全部连接配置写入 JSON 文件
-pub fn save(configs: &[ConnectionConfig]) -> Result<(), String> {
-    let path = config_path();
-    let content =
-        serde_json::to_string_pretty(configs).map_err(|e| format!("Serialize error: {}", e))?;
-    std::fs::write(&path, content).map_err(|e| format!("Write error: {}", e))
+/// 保存所有连接配置（事务内全量替换）
+pub fn save(all: &[ConnectionConfig]) -> Result<(), String> {
+    let conn = db::get_connection().map_err(|e| format!("数据库连接失败: {}", e))?;
+    conn.execute_batch("BEGIN IMMEDIATE")
+        .map_err(|e| format!("事务开始失败: {}", e))?;
+
+    let result = (|| {
+        conn.execute("DELETE FROM configs", [])
+            .map_err(|e| format!("清空失败: {}", e))?;
+        let now = now_timestamp();
+        for config in all {
+            let data =
+                serde_json::to_string(config).map_err(|e| format!("序列化失败: {}", e))?;
+            conn.execute(
+                "INSERT INTO configs (id, name, host, username, data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![config.id, config.name, config.host, config.username, data, now, now],
+            )
+            .map_err(|e| format!("插入失败: {}", e))?;
+        }
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => conn.execute_batch("COMMIT").map_err(|e| format!("提交失败: {}", e))?,
+        Err(e) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(e);
+        }
+    }
+    Ok(())
 }
 
-/// 添加新配置到列表末尾并保存
+/// 添加单个连接配置
 pub fn add(config: ConnectionConfig) -> Result<(), String> {
-    let mut configs = load();
-    configs.push(config);
-    save(&configs)
+    let conn = db::get_connection().map_err(|e| format!("数据库连接失败: {}", e))?;
+    let now = now_timestamp();
+    let data = serde_json::to_string(&config).map_err(|e| format!("序列化失败: {}", e))?;
+    conn.execute(
+        "INSERT INTO configs (id, name, host, username, data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![config.id, config.name, config.host, config.username, data, now, now],
+    )
+    .map_err(|e| format!("插入失败: {}", e))?;
+    Ok(())
 }
 
-/// 按 ID 更新已有配置，未找到时返回错误
+/// 按 ID 更新已有配置
 pub fn update(id: &str, config: ConnectionConfig) -> Result<(), String> {
-    let mut configs = load();
-    if let Some(existing) = configs.iter_mut().find(|c| c.id == id) {
-        *existing = config;
-        save(&configs)
-    } else {
-        Err(format!("Config with id '{}' not found", id))
+    let conn = db::get_connection().map_err(|e| format!("数据库连接失败: {}", e))?;
+    let now = now_timestamp();
+    let data = serde_json::to_string(&config).map_err(|e| format!("序列化失败: {}", e))?;
+    let affected = conn
+        .execute(
+            "UPDATE configs SET name=?1, host=?2, username=?3, data=?4, updated_at=?5 WHERE id=?6",
+            rusqlite::params![config.name, config.host, config.username, data, now, id],
+        )
+        .map_err(|e| format!("更新失败: {}", e))?;
+    if affected == 0 {
+        return Err(format!("Config with id '{}' not found", id));
     }
+    Ok(())
 }
 
-/// 按 ID 删除配置，未找到时返回错误
+/// 按 ID 删除配置
 pub fn remove_by_id(id: &str) -> Result<(), String> {
-    let mut configs = load();
-    let before = configs.len();
-    configs.retain(|c| c.id != id);
-    if configs.len() < before {
-        save(&configs)
-    } else {
-        Err(format!("Config with id '{}' not found", id))
+    let conn = db::get_connection().map_err(|e| format!("数据库连接失败: {}", e))?;
+    let affected = conn
+        .execute("DELETE FROM configs WHERE id=?1", rusqlite::params![id])
+        .map_err(|e| format!("删除失败: {}", e))?;
+    if affected == 0 {
+        return Err(format!("Config with id '{}' not found", id));
     }
+    Ok(())
 }
 
-/// 按名称删除所有匹配的配置并保存
+/// 按名称删除配置
 pub fn remove_by_name(name: &str) -> Result<(), String> {
-    let mut configs = load();
-    configs.retain(|c| c.name != name);
-    save(&configs)
+    let conn = db::get_connection().map_err(|e| format!("数据库连接失败: {}", e))?;
+    conn.execute("DELETE FROM configs WHERE name=?1", rusqlite::params![name])
+        .map_err(|e| format!("删除失败: {}", e))?;
+    Ok(())
+}
+
+fn now_timestamp() -> String {
+    use std::time::SystemTime;
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs().to_string())
+        .unwrap_or_else(|_| "0".to_string())
 }

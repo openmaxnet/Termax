@@ -28,6 +28,7 @@ const MonitorOverlay = React.lazy(() => import('@/features/monitoring/MonitorOve
 const QuickPanel = React.lazy(() => import('@/features/connection/QuickPanel').then((m) => ({ default: m.QuickPanel })));
 const ConnectionManager = React.lazy(() => import('@/features/connection/ConnectionManager').then((m) => ({ default: m.ConnectionManager })));
 const SettingsDialog = React.lazy(() => import('@/features/settings/SettingsDialog').then((m) => ({ default: m.SettingsDialog })));
+const CredentialManager = React.lazy(() => import('@/features/credential/CredentialManager').then((m) => ({ default: m.CredentialManager })));
 const SftpLayout = React.lazy(() => import('@/features/sftp/SftpLayout').then((m) => ({ default: m.SftpLayout })));
 const SftpWorkspace = React.lazy(() => import('@/features/sftp/SftpWorkspace').then((m) => ({ default: m.SftpWorkspace })));
 
@@ -38,6 +39,7 @@ export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sftpOpen, setSftpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [credentialOpen, setCredentialOpen] = useState(false);
   const [savedConfigs, setSavedConfigs] = useState<ConnectionConfig[]>([]);
   const [editConfig, setEditConfig] = useState<ConnectionConfig | null>(null);
   const [managerEntry, setManagerEntry] = useState<'ssh' | 'wsl'>('ssh');
@@ -168,6 +170,7 @@ export const AppLayout: React.FC = () => {
         onNewConnection={() => setShowQuick(true)}
         onSftpConnect={handleSftpConnect}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenCredentialManager={() => setCredentialOpen(true)}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onTabClick={handleTabClick}
         onSplit={doSplit}
@@ -198,6 +201,7 @@ export const AppLayout: React.FC = () => {
       <QuickPanel open={showQuick} onClose={() => setShowQuick(false)} onNewSSH={() => { setShowQuick(false); setEditConfig(null); setManagerEntry('ssh'); setShowManager(true); }} onLocalConnect={handleLocalConnect} onConnect={handleConnect} onSftpConnect={handleSftpConnect} onWslConnect={handleWslConnect} />
       <ConnectionManager open={showManager} onClose={() => setShowManager(false)} editConfig={editConfig} onConnect={handleConnect} onConfigsChange={loadConfigs} entryType={managerEntry} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <CredentialManager open={credentialOpen} onClose={() => setCredentialOpen(false)} />
 
       {/* Split replace confirm */}
       <AlertDialog open={!!(pendingReplace !== null || pendingSftpConfig) && !!split} onOpenChange={(v) => { if (!v) { setPendingReplace(null); setPendingSftpConfig(null); } }}>

@@ -11,6 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::error::{AppError, CmdResult};
 use crate::ssh::config::ConnectionConfig;
+use crate::storage::credential_store;
 
 /// 拼接远程路径：确保 base 和 name 之间只有一个斜杠
 fn join_path(base: &str, name: &str) -> String {
@@ -91,15 +92,18 @@ async fn connect_sftp(
         .await
         .map_err(|e| AppError::SshError(format!("连接失败: {}", e)))?;
 
-    let result = match &config.auth_method {
-        crate::ssh::config::AuthMethod::Password(pw) => {
+    // 解析认证信息（支持内嵌和凭证引用）
+    let resolved = credential_store::resolve_auth(&config.auth_method)?;
+
+    let result = match resolved {
+        credential_store::ResolvedAuth::Password(pw) => {
             handle
-                .authenticate_password(&config.username, pw)
+                .authenticate_password(&config.username, &pw)
                 .await
                 .map_err(|e| AppError::SshError(format!("认证失败: {}", e)))?
         }
-        crate::ssh::config::AuthMethod::Key { path, passphrase } => {
-            let key = russh::keys::load_secret_key(path, passphrase.as_deref())
+        credential_store::ResolvedAuth::Key { path, passphrase } => {
+            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
                 .map_err(|e| AppError::SshError(format!("密钥错误: {}", e)))?;
             let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
             handle

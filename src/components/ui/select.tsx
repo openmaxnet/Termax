@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { useClickOutside } from "@/hooks/useClickOutside"
 import { clampToViewport } from "@/lib/utils"
@@ -130,7 +131,7 @@ function SelectContentInner({ children, className }: { children: React.ReactNode
   const triggerRect = triggerRef.current?.getBoundingClientRect()
   if (!triggerRect) return null
 
-  return (
+  const popup = (
     <div
       ref={popupRef}
       role="listbox"
@@ -152,6 +153,8 @@ function SelectContentInner({ children, className }: { children: React.ReactNode
       {children}
     </div>
   )
+
+  return createPortal(popup, document.body)
 }
 
 // ═══ Item ═══

@@ -3,7 +3,7 @@
  * 列表形式展示跳板机序列，支持添加/编辑/删除/去重
  * 操作通过右键菜单（TContextMenu）完成
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { Shield } from 'lucide-react';
 import { useI18n } from '@/i18n';
@@ -15,14 +15,16 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import type { BastionConfig as BastionConfigType } from '@/lib/ipc';
+import { Sel } from '@/features/settings/helpers';
+import { ipc } from '@/lib/ipc';
+import type { BastionConfig as BastionConfigType, SshCredential } from '@/lib/ipc';
 
 interface BastionConfigProps {
   value: BastionConfigType[];
   onChange: (config: BastionConfigType[]) => void;
 }
 
-type AuthType = 'none' | 'password' | 'key';
+type AuthType = 'none' | 'password' | 'credential';
 
 const FormRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex items-center gap-2" style={{ minHeight: 30 }}>
@@ -142,7 +144,7 @@ const BastionForm: React.FC<{
   const [username, setUsername] = useState(initial?.username || '');
   const [authType, setAuthType] = useState<AuthType>(() => {
     if (!initial) return 'none';
-    if (initial.auth_method && 'Key' in initial.auth_method) return 'key';
+    if (initial.auth_method && 'Credential' in initial.auth_method) return 'credential';
     if (initial.auth_method && 'Password' in initial.auth_method && (initial.auth_method as any).Password) return 'password';
     return 'none';
   });
@@ -150,29 +152,42 @@ const BastionForm: React.FC<{
     if (initial?.auth_method && 'Password' in initial.auth_method) return (initial.auth_method as { Password: string }).Password;
     return '';
   });
-  const [keyPath, setKeyPath] = useState(() => {
-    if (initial?.auth_method && 'Key' in initial.auth_method) return (initial.auth_method as { Key: { path: string } }).Key.path;
+  const [credentialId, setCredentialId] = useState(() => {
+    if (initial?.auth_method && 'Credential' in initial.auth_method) return (initial.auth_method as { Credential: string }).Credential;
     return '';
   });
-  const [passphrase, setPassphrase] = useState(() => {
-    if (initial?.auth_method && 'Key' in initial.auth_method) return (initial.auth_method as { Key: { passphrase?: string } }).Key.passphrase;
-    return '';
-  });
+  const [credentials, setCredentials] = useState<SshCredential[]>([]);
   const [localDup, setLocalDup] = useState('');
-  const fileRef = React.useRef<HTMLInputElement>(null);
   const isEditing = !!initial;
+
+  useEffect(() => {
+    ipc.credential.list().then(setCredentials).catch(() => {});
+  }, []);
 
   const handleSave = () => {
     if (!host.trim() || !username.trim()) return;
-    const item: BastionConfigType = { name, host, port, username, auth_method: authType === 'password' ? { Password: password } : authType === 'key' ? { Key: { path: keyPath, passphrase: passphrase || undefined } } : { Password: '' } };
+    if (authType === 'none') return;
+    const item: BastionConfigType = {
+      name, host, port, username,
+      auth_method: authType === 'password'
+        ? { Password: password }
+        : authType === 'credential'
+        ? { Credential: credentialId }
+        : { Password: '' },
+    };
     if (!skipDup && existingKeys?.has(itemKey(item))) { setLocalDup(t('bastion.dupError')); return; }
     onSave(item);
   };
 
   const authBtnClass = (at: AuthType) =>
     authType === at
-      ? 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default) inline-flex items-center'
-      : 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) inline-flex items-center';
+      ? 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default) inline-flex items-center gap-1'
+      : 'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border border-(--tx-border-light) bg-transparent text-(--tx-text-secondary) inline-flex items-center gap-1';
+
+  const credOptions = credentials.map((c) => ({
+    value: c.id,
+    label: `${c.name} (${'Key' in c.kind ? t('credential.key') : t('credential.password')})`,
+  }));
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -186,29 +201,20 @@ const BastionForm: React.FC<{
 
       <FormRow label={t('bastion.authType')}>
         <div className="flex gap-1">
-          {(['none', 'password', 'key'] as AuthType[]).map((at) => (
-            <button key={at} onClick={() => setAuthType(at)} className={authBtnClass(at)}>
-              {at === 'none' ? t('manager.none') : at === 'password' ? t('manager.password') : t('manager.keyFile')}
-            </button>
-          ))}
+          <button onClick={() => setAuthType('none')} className={authBtnClass('none')}>{t('manager.none')}</button>
+          <button onClick={() => setAuthType('password')} className={authBtnClass('password')}>{t('manager.password')}</button>
+          <button onClick={() => setAuthType('credential')} className={authBtnClass('credential')}>
+            {t('credential.fromCredential')}
+          </button>
         </div>
       </FormRow>
 
-      {authType === 'password' && <FormRow label={t('bastion.password')}><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('bastion.passwordPlaceholder')} /></FormRow>}
-      {authType === 'key' && (
-        <>
-          <FormRow label={t('bastion.keyPath')}>
-            <div className="relative flex-1">
-              <Input value={keyPath} onChange={(e) => setKeyPath(e.target.value)} placeholder={t('bastion.keyPathPlaceholder')} className="pr-8" />
-              <button onClick={() => fileRef.current?.click()} tabIndex={-1} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-(--tx-text-tertiary) hover:text-(--tx-text-secondary)">
-                <Icon icon="solar:folder-linear" width={16} height={16} />
-              </button>
-              <input ref={fileRef} type="file" onChange={(e) => { const f = e.target.files?.[0]; if (f) setKeyPath((f as any).path || f.name); e.target.value = ''; }} className="hidden" />
-            </div>
-          </FormRow>
-          <FormRow label={t('bastion.passphrase')}><Input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} placeholder={t('bastion.passphrasePlaceholder')} /></FormRow>
-        </>
+      {authType === 'credential' && (
+        <FormRow label={t('credential.selectCredential')}>
+          <Sel value={credentialId} options={credOptions} onChange={setCredentialId} />
+        </FormRow>
       )}
+      {authType === 'password' && <FormRow label={t('bastion.password')}><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('bastion.passwordPlaceholder')} /></FormRow>}
 
       <div className="flex gap-2 justify-end mt-2">
         <Button variant="outline" onClick={onCancel}>{t('manager.cancel')}</Button>

@@ -27,6 +27,7 @@ import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 interface TitleBarProps {
   onNewConnection: () => void;
   onOpenSettings: () => void;
+  onOpenCredentialManager: () => void;
   onToggleSidebar: () => void;
   onSplit: (direction: 'horizontal' | 'vertical') => void;
   onCloseSplit: () => void;
@@ -37,7 +38,7 @@ interface TitleBarProps {
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
-  onNewConnection, onOpenSettings, onToggleSidebar,
+  onNewConnection, onOpenSettings, onOpenCredentialManager, onToggleSidebar,
   onSplit, onCloseSplit, onSftpConnect, onTabClick, isSplit, sidebarOpen,
 }) => {
   const [maximized, setMaximized] = useState(false);
@@ -249,6 +250,12 @@ export const TitleBar: React.FC<TitleBarProps> = ({
             <Icon icon={appTheme === 'system' ? 'solar:tablet-broken' : appTheme === 'dark' ? 'solar:moon-linear' : 'solar:sun-linear'} width={18} height={18} />
           </TooltipTrigger>
           <TooltipContent>{t('titleBar.toggleTheme')}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={onOpenCredentialManager} />}>
+            <Icon icon="solar:shield-keyhole-minimalistic-broken" width={18} height={18} />
+          </TooltipTrigger>
+          <TooltipContent>{t('credential.title')}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={onOpenSettings} />}>

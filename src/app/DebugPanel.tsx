@@ -37,10 +37,14 @@ export const DebugPanel: React.FC = () => {
     onDebugModeChange(debugMode);
   }, [debugMode]);
 
-  // 自动滚动日志到底部
+  // 自动滚动日志到底部（等待 DOM reflow 后再滚动）
   useEffect(() => {
     const el = logListRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
   }, [logs]);
 
   // 拖拽

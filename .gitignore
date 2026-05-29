@@ -38,6 +38,7 @@ npm-debug.log*
 pnpm-debug.log*
 
 # ── Misc ──
+test/
 *.local
 *.suo
 *.ntvs*

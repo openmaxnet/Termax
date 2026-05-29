@@ -55,11 +55,11 @@ jobs:
             if [ -n "$PREV_TAG" ]; then
               echo "## 更新日志 ($PREV_TAG → ${{ github.ref_name }})"
               echo ""
-              git log --oneline --no-decorate "${PREV_TAG}..HEAD" | sed 's/^/- /'
+              git log --format="- %s%n%b" "${PREV_TAG}..HEAD" | sed '/^$/d'
             else
               echo "## 首次发布"
               echo ""
-              git log --oneline --no-decorate | sed 's/^/- /'
+              git log --format="- %s%n%b" | sed '/^$/d'
             fi
           } > changelog.md
           echo "CHANGELOG<<EOF" >> $GITHUB_ENV

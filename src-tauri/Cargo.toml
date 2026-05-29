@@ -1,6 +1,6 @@
 [package]
 name = "termax"
-version = "0.1.0"
+version = "0.1.2"
 description = "Termax - A modern SSH terminal"
 authors = ["you"]
 license = ""
@@ -53,9 +53,15 @@ notify = { version = "7", features = ["macos_kqueue"] }
 # Terminal
 portable-pty = "0.9"
 
-# Keychain
-keyring = "3.6"
+# Encryption
+aes-gcm = "0.10"
+base64 = "0.22"
+rand = "0.8"
+
+# Database
+rusqlite = { version = "0.40.0", features = ["bundled"] }
 
 # System font enumeration
 font-kit = "0.14"
 tauri-plugin-clipboard-manager = "2.3.2"
+rfd = "0.15"

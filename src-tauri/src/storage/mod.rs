@@ -1,4 +1,8 @@
 //! 持久化存储层
-//! 使用 JSON 文件存储连接配置，遵循"加载→修改→保存"模式。
+//! 使用 SQLite 数据库统一管理所有本地持久化数据。
 
+pub mod credential_store;
+pub mod crypto;
+pub mod db;
+pub mod migration;
 pub mod store;

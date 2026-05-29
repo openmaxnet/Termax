@@ -174,7 +174,7 @@ export function clearLogs(): void {
   notify();
 }
 
-/** 导出日志到文件（通过 Blob + 下载） */
+/** 导出日志到文件（通过原生"另存为"对话框选择保存路径） */
 export async function exportLogs(): Promise<void> {
   if (state.logs.length === 0) return;
 
@@ -191,16 +191,15 @@ export async function exportLogs(): Promise<void> {
   };
 
   const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const now = new Date();
-  const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-  a.href = url;
-  a.download = `debug_${ts}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  console.log(`[Termax Debug] 日志已导出: ${a.download}`);
+
+  try {
+    const { ipc } = await import('@/lib/ipc');
+    const savedPath = await ipc.debug.saveLogFile(json);
+    console.log(`[Termax Debug] 日志已导出: ${savedPath}`);
+  } catch (e) {
+    console.error('[Termax Debug] 日志导出失败:', e);
+    throw e;
+  }
 }
 
 // ═══ debugMode 切换监听 ═══

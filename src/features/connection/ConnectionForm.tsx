@@ -1,17 +1,19 @@
 /**
  * 连接表单组件
- * 远程连接配置编辑表单，支持密码/密钥认证方式切换、
- * 主机/端口/用户名/分组等字段录入和基础验证
+ * 远程连接配置编辑表单，支持密码/密钥/凭证库认证方式切换、
+ * 主机/端口/用户名等字段录入和基础验证
  */
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Icon } from '@iconify/react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import type { ConnectionConfig } from '@/lib/ipc';
+import { Sel } from '@/features/settings/helpers';
+import { ipc } from '@/lib/ipc';
+import type { ConnectionConfig, SshCredential } from '@/lib/ipc';
 
-/** 认证方式：无/密码/密钥 */
-type AuthType = 'none' | 'password' | 'key';
+/** 认证方式：无/密码/凭证库（密钥文件已合并到凭证库中管理） */
+type AuthType = 'none' | 'password' | 'credential';
 
 /**
  * 连接表单实例句柄
@@ -38,30 +40,35 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
 
 /**
  * 远程连接配置表单
- * 支持密码/密钥两种认证方式，含字段校验
+ * 支持密码、密钥和凭证库三种认证方式，含字段校验
  */
 export const ConnectionForm = forwardRef<ConnectionFormHandle, ConnectionFormProps>(({
   config, t,
 }, ref) => {
   const [f, setF] = useState({
     name: '', host: '', port: 22, username: '',
-    authType: 'none' as AuthType, password: '', keyPath: '', passphrase: '',
+    authType: 'none' as AuthType, password: '',
+    credentialId: '',
   });
   const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState<Set<string>>(new Set());
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [credentials, setCredentials] = useState<SshCredential[]>([]);
 
   useEffect(() => {
+    ipc.credential.list().then(setCredentials).catch(() => {});
+
     if (config) {
+      const isCred = config.auth_method && 'Credential' in config.auth_method;
       const pw = config.auth_method && 'Password' in config.auth_method ? config.auth_method.Password : '';
-      const key = config.auth_method && 'Key' in config.auth_method ? config.auth_method.Key : null;
+      const credId = isCred ? (config.auth_method as { Credential: string }).Credential : '';
       setF({
         name: config.name || '', host: config.host, port: config.port, username: config.username,
-        authType: pw === '' && !key ? 'none' : key ? 'key' : 'password',
-        password: pw, keyPath: key?.path || '', passphrase: key?.passphrase || '',
+        authType: isCred ? 'credential' : (pw ? 'password' : 'none'),
+        password: pw,
+        credentialId: credId,
       });
     } else {
-      setF({ name: '', host: '', port: 22, username: '', authType: 'none', password: '', keyPath: '', passphrase: '' });
+      setF({ name: '', host: '', port: 22, username: '', authType: 'none', password: '', credentialId: '' });
     }
     setErrors(new Set());
   }, [config]);
@@ -72,8 +79,8 @@ export const ConnectionForm = forwardRef<ConnectionFormHandle, ConnectionFormPro
     host: f.host, port: f.port, username: f.username,
     auth_method: f.authType === 'password'
       ? { Password: f.password }
-      : f.authType === 'key'
-      ? { Key: { path: f.keyPath, passphrase: f.passphrase || undefined } }
+      : f.authType === 'credential'
+      ? { Credential: f.credentialId }
       : { Password: '' },
     group: config?.group || undefined,
     bastion: config?.bastion || [],
@@ -84,7 +91,8 @@ export const ConnectionForm = forwardRef<ConnectionFormHandle, ConnectionFormPro
     if (!f.host.trim()) errs.add('host');
     if (!f.username.trim()) errs.add('username');
     if (f.authType === 'password' && !f.password) errs.add('password');
-    if (f.authType === 'key' && !f.keyPath) errs.add('keyPath');
+    if (f.authType === 'none') errs.add('authType');
+    if (f.authType === 'credential' && !f.credentialId) errs.add('credentialId');
     setErrors(errs);
     return errs.size === 0;
   }, [f]);
@@ -98,21 +106,18 @@ export const ConnectionForm = forwardRef<ConnectionFormHandle, ConnectionFormPro
     setErrors((prev) => { const n = new Set(prev); n.delete(k); return n; });
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const filePath = (file as any).path || file.name;
-      set('keyPath', filePath);
-    }
-    e.target.value = '';
-  };
-
   const authBtnClass = (type: AuthType) => cn(
     'h-7 px-3 text-xs font-medium rounded-(--tx-radius-sm) border transition-colors inline-flex items-center',
     f.authType === type
       ? 'border-(--tx-accent-default) bg-(--tx-accent-muted) text-(--tx-accent-default)'
       : 'border-(--tx-border-light) bg-transparent text-(--tx-text-secondary)',
   );
+
+  // 凭证下拉选项
+  const credOptions = credentials.map((c) => ({
+    value: c.id,
+    label: `${c.name} (${'Key' in c.kind ? t('credential.key') : t('credential.password')})`,
+  }));
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -136,13 +141,26 @@ export const ConnectionForm = forwardRef<ConnectionFormHandle, ConnectionFormPro
       {/* ═══ Authentication ═══ */}
       <div className="flex flex-col gap-1.5">
         <Row label={t('manager.authType')}>
-          <div className="flex gap-1">
+          <div className={cn('flex gap-1', errors.has('authType') && 'ring-1 ring-(--tx-red) rounded-(--tx-radius-sm)')}>
             <button onClick={() => set('authType', 'none')} className={authBtnClass('none')}>{t('manager.none')}</button>
             <button onClick={() => set('authType', 'password')} className={authBtnClass('password')}>{t('manager.password')}</button>
-            <button onClick={() => set('authType', 'key')} className={authBtnClass('key')}>{t('manager.keyFile')}</button>
+            <button onClick={() => set('authType', 'credential')} className={authBtnClass('credential')}>
+              {t('credential.fromCredential')}
+            </button>
           </div>
         </Row>
-        {f.authType === 'password' ? (
+        {f.authType === 'credential' && (
+          <Row label={t('credential.selectCredential')}>
+            <div className={cn(errors.has('credentialId') && '[&>button]:border-(--tx-red)')}>
+              <Sel
+                value={f.credentialId}
+                options={credOptions}
+                onChange={(v) => { setF((p) => ({ ...p, credentialId: v })); setErrors((prev) => { const n = new Set(prev); n.delete('credentialId'); return n; }); }}
+              />
+            </div>
+          </Row>
+        )}
+        {f.authType === 'password' && (
           <Row label={t('manager.password')}>
             <div className="relative flex-1">
               <Input type={showPw ? 'text' : 'password'} placeholder={t('manager.passwordPlaceholder')} value={f.password} onChange={(e) => set('password', e.target.value)} className={cn('pr-8', errors.has('password') && 'border-(--tx-red)')} />
@@ -152,23 +170,7 @@ export const ConnectionForm = forwardRef<ConnectionFormHandle, ConnectionFormPro
               </button>
             </div>
           </Row>
-        ) : f.authType === 'key' ? (
-          <>
-            <Row label={t('manager.keyPath')}>
-              <div className="relative flex-1">
-                <Input placeholder={t('manager.keyPathPlaceholder')} value={f.keyPath} onChange={(e) => set('keyPath', e.target.value)} className={cn('pr-8', errors.has('keyPath') && 'border-(--tx-red)')} />
-                <button onClick={() => fileRef.current?.click()} tabIndex={-1}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-(--tx-text-tertiary) hover:text-(--tx-text-secondary)">
-                  <Icon icon="solar:folder-linear" width={16} height={16} />
-                </button>
-                <input ref={fileRef} type="file" onChange={handleFileSelected} className="hidden" />
-              </div>
-            </Row>
-            <Row label={t('manager.passphrase')}>
-              <Input type="password" placeholder={t('manager.passphrasePlaceholder')} value={f.passphrase} onChange={(e) => set('passphrase', e.target.value)} />
-            </Row>
-          </>
-        ) : null}
+        )}
       </div>
     </div>
   );

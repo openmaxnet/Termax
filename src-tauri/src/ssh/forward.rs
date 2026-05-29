@@ -15,7 +15,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 
 use crate::error::{AppError, CmdResult};
-use crate::ssh::config::{AuthMethod, ConnectionConfig, PortForwardRule};
+use crate::ssh::config::{ConnectionConfig, PortForwardRule};
+use crate::storage::credential_store;
 
 /// SSH 处理器：信任所有主机密钥
 struct ForwardHandler;
@@ -28,20 +29,23 @@ impl client::Handler for ForwardHandler {
     }
 }
 
-/// 建立 SSH 连接并完成用户认证（密码或密钥），返回可用于开 channel 的 handle
+/// 建立 SSH 连接并完成用户认证（密码、密钥或凭证引用），返回可用于开 channel 的 handle
 async fn connect_and_auth(config: &ConnectionConfig) -> Result<client::Handle<ForwardHandler>, AppError> {
     let cfg = Arc::new(client::Config::default());
     let mut handle = client::connect(cfg, (&config.host[..], config.port), ForwardHandler)
         .await
         .map_err(|e| AppError::SshError(format!("转发连接失败: {}", e)))?;
 
-    let result = match &config.auth_method {
-        AuthMethod::Password(pw) => handle
-            .authenticate_password(&config.username, pw)
+    // 解析认证信息（支持内嵌和凭证引用）
+    let resolved = credential_store::resolve_auth(&config.auth_method)?;
+
+    let result = match resolved {
+        credential_store::ResolvedAuth::Password(pw) => handle
+            .authenticate_password(&config.username, &pw)
             .await
             .map_err(|e| AppError::SshError(format!("认证失败: {}", e)))?,
-        AuthMethod::Key { path, passphrase } => {
-            let key = russh::keys::load_secret_key(path, passphrase.as_deref())
+        credential_store::ResolvedAuth::Key { path, passphrase } => {
+            let key = russh::keys::load_secret_key(&path, passphrase.as_deref())
                 .map_err(|e| AppError::SshError(format!("密钥错误: {}", e)))?;
             let kh = russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None);
             handle

@@ -5,5 +5,6 @@
 pub mod client;
 pub mod channel;
 pub mod config;
+pub mod credential;
 pub mod forward;
 pub mod proxy;

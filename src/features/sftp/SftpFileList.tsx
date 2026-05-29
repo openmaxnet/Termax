@@ -83,7 +83,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
               <Icon icon={isEditingNew
                 ? (editing?.type === 'newDir' ? 'solar:folder-linear' : 'solar:file-linear')
                 : fileIcon(entry.name, entry.is_dir)
-              } width={16} height={16} color="var(--tx-text-secondary)" className="shrink-0" />
+              } width={16} height={16} color="var(--tx-text-tertiary)" className="shrink-0" />
               {activeEdits.some((ae) => ae.path === entry.path) && (
                 <div className="w-1.25 h-1.25 rounded-full bg-(--tx-green) shrink-0" />
               )}
@@ -107,7 +107,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
               <input ref={inputRef} value={editValue} onChange={(e) => setEditValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && editValue.trim()) doConfirmEdit(); if (e.key === 'Escape') cancelEdit(); }}
                 autoFocus placeholder={editing?.type === 'newDir' ? t('fileBrowser.newFolder') : t('fileBrowser.newFile')}
-                className="w-full px-1 py-px rounded-sm border border-(--tx-accent-default) bg-(--tx-bg-base) text-(--tx-text-primary) text-xs outline-none"
+                className="w-full px-1 py-px rounded-sm border border-(--tx-accent-default) bg-(--tx-bg-base) text-(--tx-text-primary) text-sm outline-none"
               />
             );
           }
@@ -117,13 +117,13 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
               <input ref={inputRef} value={editValue} onChange={(e) => setEditValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && editValue.trim()) doConfirmEdit(); if (e.key === 'Escape') cancelEdit(); }}
                 onBlur={cancelEdit} autoFocus
-                className="w-full px-1 py-px rounded-sm border border-(--tx-accent-default) bg-(--tx-bg-base) text-(--tx-text-primary) text-xs outline-none"
+                className="w-full px-1 py-px rounded-sm border border-(--tx-accent-default) bg-(--tx-bg-base) text-(--tx-text-primary) text-sm outline-none"
               />
             );
           }
 
           return (
-            <span className="block truncate text-(--tx-text-primary) text-xs">{entry.name}</span>
+            <span className="block truncate text-(--tx-text-primary)">{entry.name}</span>
           );
         },
         meta: { headerClassName: '' } as DataTableColumnMeta,
@@ -137,7 +137,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
         cell: ({ row }) => {
           const entry = row.original;
           if (entry.path === NEW_ITEM_KEY) return null;
-          return <span className="block text-right text-(--tx-text-primary) text-xs">{formatSize(entry.size)}</span>;
+          return <span className="block text-right text-(--tx-text-primary)">{formatSize(entry.size)}</span>;
         },
         meta: { cellClassName: 'text-right' } as DataTableColumnMeta,
       },
@@ -150,7 +150,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
         cell: ({ row }) => {
           const entry = row.original;
           if (entry.path === NEW_ITEM_KEY) return null;
-          return <span className="block text-right text-(--tx-text-primary) text-xs">{formatTime(entry.mtime)}</span>;
+          return <span className="block text-right text-(--tx-text-primary)">{formatTime(entry.mtime)}</span>;
         },
         meta: { cellClassName: 'text-right' } as DataTableColumnMeta,
       },
@@ -166,7 +166,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
           enableResizing: true,
           cell: ({ row }) => {
             if (row.original.path === NEW_ITEM_KEY) return null;
-            return <span className="block text-center text-(--tx-text-primary) text-xs">{formatMode(row.original.permissions)}</span>;
+            return <span className="block text-center text-(--tx-text-primary)">{formatMode(row.original.permissions)}</span>;
           },
           meta: { cellClassName: 'text-center' } as DataTableColumnMeta,
         },
@@ -178,7 +178,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
           enableResizing: true,
           cell: ({ row }) => {
             if (row.original.path === NEW_ITEM_KEY) return null;
-            return <span className="block text-center text-(--tx-text-primary) text-xs">{formatOwner(row.original.uid)}</span>;
+            return <span className="block text-center text-(--tx-text-primary)">{formatOwner(row.original.uid)}</span>;
           },
           meta: { cellClassName: 'text-center' } as DataTableColumnMeta,
         },
@@ -190,7 +190,7 @@ export const SftpFileList: React.FC<SftpFileListProps> = ({
           enableResizing: true,
           cell: ({ row }) => {
             if (row.original.path === NEW_ITEM_KEY) return null;
-            return <span className="block text-center text-(--tx-text-primary) text-xs">{formatOwner(row.original.gid)}</span>;
+            return <span className="block text-center text-(--tx-text-primary)">{formatOwner(row.original.gid)}</span>;
           },
           meta: { cellClassName: 'text-center' } as DataTableColumnMeta,
         },

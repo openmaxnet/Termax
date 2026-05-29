@@ -7,7 +7,7 @@ export interface ConnectionConfig {
   host: string;
   port: number;
   username: string;
-  auth_method: { Password: string } | { Key: { path: string; passphrase?: string } };
+  auth_method: { Password: string } | { Key: { path: string; passphrase?: string } } | { Credential: string };
   group?: string | null;
   /** 跳板机链，按顺序连接。空数组=直连 */
   bastion: BastionConfig[];
@@ -21,7 +21,26 @@ export interface BastionConfig {
   host: string;
   port: number;
   username: string;
-  auth_method: { Password: string } | { Key: { path: string; passphrase?: string } };
+  auth_method: { Password: string } | { Key: { path: string; passphrase?: string } } | { Credential: string };
+}
+
+/** SSH 凭证类型：密钥认证或密码认证 */
+export type CredentialKind =
+  | { Key: { path: string; passphrase_stored: boolean } }
+  | { Password: string };
+
+/** SSH 凭证：集中管理的认证信息 */
+export interface SshCredential {
+  id: string;
+  name: string;
+  kind: CredentialKind;
+  /** AES-256-GCM 加密后的敏感数据，base64(nonce || ciphertext) */
+  encrypted_secret?: string | null;
+  /** 是否已保存敏感信息 */
+  has_secret: boolean;
+  created_at: number;
+  updated_at: number;
+  tags: string[];
 }
 
 /** 本地文件/目录条目 */

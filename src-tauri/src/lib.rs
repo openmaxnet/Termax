@@ -15,6 +15,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use commands::config_cmd::{delete_config, delete_config_by_id, load_configs, save_config, update_config};
+use commands::credential_cmd::{list_credentials, save_credential, update_credential, delete_credential, get_credential_secret, check_credential_usage, pick_file};
+use commands::debug_cmd::save_log_file;
 use commands::edit_cmd::{sftp_start_edit, sftp_stop_edit, sftp_list_edits};
 use commands::sftp_cmd::{sftp_cancel_transfer, sftp_create_dir, sftp_delete_entry, sftp_download_chunked, sftp_download_file, sftp_download_to_downloads, sftp_get_stat, sftp_list_files, sftp_read_file, sftp_rename, sftp_upload_chunked, sftp_upload_file, sftp_write_file};
 use commands::local_cmd::LocalAppState;
@@ -65,6 +67,14 @@ pub fn run() {
             load_configs,
             delete_config,
             delete_config_by_id,
+            list_credentials,
+            save_credential,
+            update_credential,
+            delete_credential,
+            get_credential_secret,
+            check_credential_usage,
+            pick_file,
+            save_log_file,
             sftp_start_edit,
             sftp_stop_edit,
             sftp_list_edits,
@@ -88,6 +98,12 @@ pub fn run() {
         .setup(|app| {
             // 清理历史编辑缓存文件，初始化临时目录
             sftp::editor::init();
+            // 初始化 SQLite 数据库（首次创建、旧数据迁移、schema 升级）
+            if let Err(e) = storage::db::init_db() {
+                log::error!("[setup] 数据库初始化失败: {}", e);
+            }
+            // 将内嵌密钥迁移到凭证管理器（幂等，已迁移则跳过）
+            storage::migration::migrate_credentials();
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
