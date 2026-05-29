@@ -52,8 +52,12 @@ debugTime('termax-boot');
       const savedW = localStorage.getItem('termax_window_w')
       const savedH = localStorage.getItem('termax_window_h')
       if (savedW && savedH) {
-        const w = Math.min(Number(savedW), 1200)
-        const h = Math.min(Number(savedH), 800)
+        const DEFAULT_W = 1100, DEFAULT_H = 720
+        const MIN_W = 640, MIN_H = 400, MAX_W = 1920, MAX_H = 1080
+        let w = Number(savedW) || DEFAULT_W
+        let h = Number(savedH) || DEFAULT_H
+        w = Math.max(MIN_W, Math.min(w, MAX_W))
+        h = Math.max(MIN_H, Math.min(h, MAX_H))
         await win.setSize(new LogicalSize(w, h))
       }
     }

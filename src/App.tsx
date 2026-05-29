@@ -40,7 +40,7 @@ function App() {
     // 窗口尺寸恢复已在 main.tsx 中于 React 挂载前完成（窗口初始隐藏，恢复后显示）
   }, [locale, rememberWindowSize]);
 
-  // 窗口缩放时保存尺寸到 localStorage（仅主窗口，非最大化状态，且用户开启记忆时）
+  // 窗口缩放时保存尺寸到 localStorage（非最大化状态，且用户开启记忆时）
   useEffect(() => {
     if (!rememberWindowSize) return;
 
@@ -49,7 +49,7 @@ function App() {
       try {
         if (await win.isMaximized()) return;
         const size = await win.innerSize();
-        if (size.width > 1200 || size.height > 800) return;
+        if (size.width < 640 || size.height < 400) return;
         localStorage.setItem('termax_window_w', String(size.width));
         localStorage.setItem('termax_window_h', String(size.height));
       } catch {}

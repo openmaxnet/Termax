@@ -125,7 +125,7 @@ export const useSettingsStore = create<SettingsState>()(
       enableWebLinks: true,
       webLinksModifier: 'ctrl' as WebLinksModifier,
       confirmTabClose: false,
-      rememberWindowSize: false,
+      rememberWindowSize: true,
       sidebarWidth: 220,
       sftpWidth: 280,
       sftpMode: 'side',
